@@ -290,11 +290,15 @@
     <span class="cdLabel">T taunt</span>
     <div class="cdBarOuter"><div id="cdTaunt" class="cdBarInner"></div></div>
   </div>
+  <div class="cdItem">
+    <span class="cdLabel">C freeze</span>
+    <div class="cdBarOuter"><div id="cdFreeze" class="cdBarInner"></div></div>
+  </div>
 </div>
 
 <div id="status"></div>
 <button id="restartBtn">FIGHT AGAIN</button>
-<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash — shreds broccoli in your path + brief invincibility &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry — punish a hit anytime by knocking it back at the boss &nbsp;|&nbsp; H: use a ketchup packet to heal (grab 🍅 pickups drifting through to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening, but the boss fires back &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a guaranteed-hit milkshake, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, and (phase 3) the steam laser!</div>
+<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash — shreds broccoli in your path + brief invincibility &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry — punish a hit anytime by knocking it back at the boss &nbsp;|&nbsp; H: use a ketchup packet to heal (grab 🍅 pickups drifting through to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening, but the boss fires back &nbsp;|&nbsp; C: Freeze Shake — slows all broccoli for a few seconds &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a guaranteed-hit milkshake, G for a wide fry spread, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles that root you if you stand in them, the sweeping kernel gatling, and (phase 3) the steam laser!</div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -316,6 +320,7 @@ const comboBarInner = document.getElementById('comboBarInner');
 const cdDash = document.getElementById('cdDash');
 const cdParry = document.getElementById('cdParry');
 const cdTaunt = document.getElementById('cdTaunt');
+const cdFreeze = document.getElementById('cdFreeze');
 
 // player avatar image (embedded, cropped to a circle)
 const avatarImg = document.getElementById('avatarImg');
@@ -401,10 +406,36 @@ let comboMeter = 0;
 const COMBO_MAX = 10;
 const ULTIMATE_DMG = 25;
 
+// Freeze Shake (C) — usable anytime. Throws an icy drink that slows every
+// broccoli on screen for a few seconds, buying you breathing room.
+let cJustPressed = false;
+let freezeActive = false;
+let freezeTimer = 0;
+let freezeCooldown = 0;
+const FREEZE_DURATION = 150;
+const FREEZE_COOLDOWN_MAX = 480;
+const FREEZE_SLOW_FACTOR = 0.4;
+
+// Fry Spread (G) — a third opening move: a fan of fries, each individually
+// weaker than a burger, but spread wide so a few are more likely to land
+let gJustPressed = false;
+const FRY_COUNT = 5;
+const FRY_DMG = 3;
+
 // --- new boss attacks ---
 let spiralTimer = 0, spiralActive = false, spiralShotsLeft = 0, spiralAngle = 0;
 let burstTimer = 0, burstState = null;   // {x, y, stage:'telegraph'|'fired', timer}
 let laserTimer = 0, laserState = null;   // {x, width, stage:'telegraph'|'active', timer, hit}
+
+// KERNEL GATLING — the boss sweeps a rapid stream of corn kernels
+// left-to-right across the top of the box in a sine sweep
+let gatlingTimer = 0, gatlingActive = false, gatlingProgress = 0, gatlingShotsLeft = 0;
+
+// RANCH PUDDLE — a floor hazard that roots you (barely able to move)
+// while you're standing in it; doesn't deal direct damage on its own,
+// but leaves you exposed to whatever else is happening
+let puddleList = [];
+let puddleTimer = 0;
 
 const dialogueLines = [
   "* The broccoli stares into your soul.",
@@ -431,7 +462,7 @@ tattleBtn.addEventListener('click', () => {
 });
 
 function initGame() {
-  player = { x: W/2, y: H - 30, r: 10, speed: 3, vx: 0, vy: 0, tilt: 0, squash: 1, trail: [], facingX: 0, facingY: -1, invulnTimer: 0, blocking: false };
+  player = { x: W/2, y: H - 30, r: 10, speed: 3, vx: 0, vy: 0, tilt: 0, squash: 1, trail: [], facingX: 0, facingY: -1, invulnTimer: 0, blocking: false, rooted: false };
   broccoliList = [];
   burgerList = [];
   bossMaxHp = 200;
@@ -469,6 +500,11 @@ function initGame() {
   tauntCooldown = 0;
   uJustPressed = false;
   comboMeter = 0;
+  cJustPressed = false;
+  freezeActive = false;
+  freezeTimer = 0;
+  freezeCooldown = 0;
+  gJustPressed = false;
   updateComboBar();
   updateCooldownBars();
   canvas.style.borderColor = '#fff';
@@ -483,6 +519,12 @@ function initGame() {
   burstState = null;
   laserTimer = 0;
   laserState = null;
+  gatlingTimer = 0;
+  gatlingActive = false;
+  gatlingProgress = 0;
+  gatlingShotsLeft = 0;
+  puddleList = [];
+  puddleTimer = 0;
   phase = 1;
   statusEl.textContent = '';
   restartBtn.style.display = 'none';
@@ -515,11 +557,12 @@ function updateCooldownBars() {
   setCooldownBar(cdDash, dashCooldown, DASH_COOLDOWN_MAX);
   setCooldownBar(cdParry, parryCooldown, PARRY_COOLDOWN_MAX);
   setCooldownBar(cdTaunt, tauntCooldown, TAUNT_COOLDOWN_MAX);
+  setCooldownBar(cdFreeze, freezeCooldown, FREEZE_COOLDOWN_MAX);
 }
 
 document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  const gameKeys = ['arrowleft','arrowright','arrowup','arrowdown','a','s','d','w',' ','q','e','f','r','h','t','u'];
+  const gameKeys = ['arrowleft','arrowright','arrowup','arrowdown','a','s','d','w',' ','q','e','f','r','h','t','u','c','g'];
   if (gameKeys.includes(k) || e.code === 'Space') {
     e.preventDefault();
   }
@@ -530,6 +573,8 @@ document.addEventListener('keydown', e => {
   if (k === 'h' && !e.repeat) hJustPressed = true;
   if (k === 't' && !e.repeat) tJustPressed = true;
   if (k === 'u' && !e.repeat) uJustPressed = true;
+  if (k === 'c' && !e.repeat) cJustPressed = true;
+  if (k === 'g' && !e.repeat) gJustPressed = true;
   keys[k] = true;
   keys[e.code] = true; // layout-independent fallback (KeyW, KeyA, KeyS, KeyD)
 }, { passive: false });
@@ -792,6 +837,79 @@ function drawLaser() {
   ctx.restore();
 }
 
+// KERNEL GATLING — a rapid sweeping stream of small corn kernels
+function updateGatling() {
+  gatlingTimer++;
+  const interval = Math.max(340, 640 - phase * 90);
+  if (!gatlingActive && gatlingTimer > interval) {
+    gatlingActive = true;
+    gatlingProgress = 0;
+    gatlingShotsLeft = 24 + phase * 5;
+    gatlingTimer = 0;
+    dialogue.textContent = "* The boss revs up a KERNEL GATLING!";
+  }
+  if (gatlingActive) {
+    if (frame % 2 === 0) {
+      gatlingProgress += 0.11;
+      const sweepX = W / 2 + Math.sin(gatlingProgress) * (W / 2 - 24);
+      broccoliList.push({
+        x: sweepX,
+        y: 10,
+        vx: 0,
+        vy: 1.6 + phase * 0.25,
+        r: 7,
+        homing: false,
+        rot: 0,
+        rotSpeed: 0.3,
+        kernel: true
+      });
+      gatlingShotsLeft--;
+    }
+    if (gatlingShotsLeft <= 0) gatlingActive = false;
+  }
+}
+
+// RANCH PUDDLE — a floor hazard that roots you while you stand in it
+function spawnPuddleIfDue() {
+  puddleTimer++;
+  const interval = Math.max(380, 720 - phase * 80);
+  if (phase >= 2 && puddleTimer > interval) {
+    puddleTimer = 0;
+    puddleList.push({
+      x: 40 + Math.random() * (W - 80),
+      y: 60 + Math.random() * (H - 120),
+      r: 24,
+      life: 280
+    });
+    dialogue.textContent = "* A puddle of ranch spreads across the floor!";
+  }
+}
+
+function updatePuddles() {
+  for (const p of puddleList) p.life--;
+  puddleList = puddleList.filter(p => p.life > 0);
+}
+
+function playerInPuddle() {
+  return puddleList.some(p => Math.hypot(p.x - player.x, p.y - player.y) < p.r + player.r * 0.6);
+}
+
+function drawPuddles() {
+  for (const p of puddleList) {
+    ctx.save();
+    const fade = Math.min(1, p.life / 40);
+    ctx.globalAlpha = 0.55 * fade;
+    ctx.fillStyle = '#f2e6c9';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, p.r, p.r * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#c9a15a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 // TATTLE TAIL — a little minion that snitches on your position, then
 // drops a telegraphed strike right where it caught you standing.
 let tattleTail = null;
@@ -931,6 +1049,25 @@ function unleashUltimate() {
   dialogue.textContent = "* ULTIMATE! The Triple Deluxe Combo connects!";
 }
 
+function throwFrySpread() {
+  const spread = 0.5; // radians across the whole fan
+  for (let i = 0; i < FRY_COUNT; i++) {
+    const t = FRY_COUNT === 1 ? 0 : (i / (FRY_COUNT - 1)) - 0.5;
+    burgerList.push({
+      x: player.x,
+      y: player.y - player.r,
+      vy: -6.2,
+      vx: t * 3.2,
+      wobble: i,
+      dmg: FRY_DMG,
+      fry: true
+    });
+  }
+  addCombo(1);
+  dialogue.textContent = "* You fling a wide spread of fries!";
+  shotCooldown = 14;
+}
+
 function startQTE() {
   qteActive = true;
   qtePos = 0;
@@ -1008,9 +1145,11 @@ function update() {
 
   // movement — smooth acceleration/friction instead of instant snapping
   player.blocking = !!(keys['e'] || keys['KeyE']);
-  const accel = player.blocking ? 0.45 : 0.9;
+  player.rooted = playerInPuddle();
+  const rootFactor = player.rooted ? 0.28 : 1;
+  const accel = (player.blocking ? 0.45 : 0.9) * rootFactor;
   const friction = 0.82;
-  const maxSpeed = player.blocking ? 1.6 : 3.4;
+  const maxSpeed = (player.blocking ? 1.6 : 3.4) * rootFactor;
   let ix = 0, iy = 0;
   if (keys['arrowleft'] || keys['a'] || keys['KeyA']) ix -= 1;
   if (keys['arrowright'] || keys['d'] || keys['KeyD']) ix += 1;
@@ -1112,6 +1251,24 @@ function update() {
     tJustPressed = false;
   }
 
+  // freeze shake (C) — usable anytime, slows every broccoli on screen
+  if (freezeCooldown > 0) freezeCooldown--;
+  if (freezeActive) {
+    freezeTimer++;
+    if (freezeTimer > FREEZE_DURATION) freezeActive = false;
+  }
+  if (cJustPressed) {
+    if (freezeCooldown <= 0) {
+      freezeActive = true;
+      freezeTimer = 0;
+      freezeCooldown = FREEZE_COOLDOWN_MAX;
+      dialogue.textContent = "* You hurl a Freeze Shake! Everything slows down!";
+    } else {
+      dialogue.textContent = "* Freeze Shake isn't ready yet!";
+    }
+    cJustPressed = false;
+  }
+
   // attack cycle — the boss attacks for a while, then opens up and
   // gives you a brief window where you're allowed to fight back
   if (!attackWindowOpen && !qteActive) {
@@ -1185,6 +1342,18 @@ function update() {
     uJustPressed = false;
   }
 
+  // FRY SPREAD (G) — a third opening move: a wide fan of weaker shots
+  if (gJustPressed) {
+    if (!qteActive && attackWindowOpen && shotCooldown <= 0) {
+      throwFrySpread();
+      attackWindowOpen = false;
+      canvas.style.borderColor = '#fff';
+    } else if (!attackWindowOpen && !qteActive) {
+      dialogue.textContent = "* Not yet — wait for an opening!";
+    }
+    gJustPressed = false;
+  }
+
   // phase escalation
   if (bossHp < bossMaxHp * 0.6 && phase === 1) {
     phase = 2;
@@ -1225,13 +1394,19 @@ function update() {
     updateSpiral();
     updateBurst();
     updateLaser();
+    updateGatling();
+    spawnPuddleIfDue();
   }
+
+  // puddles persist and can be walked out of even during an opening
+  updatePuddles();
 
   // ketchup pickups drift through regardless of attack-cycle phase
   spawnKetchupIfDue();
   updateKetchup();
 
-  // update broccoli (with homing behavior)
+  // update broccoli (with homing behavior), slowed while Freeze Shake is active
+  const moveScale = freezeActive ? FREEZE_SLOW_FACTOR : 1;
   for (let b of broccoliList) {
     if (b.homing) {
       const dx = player.x - b.x, dy = player.y - b.y;
@@ -1246,18 +1421,19 @@ function update() {
         b.vy = (b.vy / spd) * maxSpd;
       }
     }
-    b.x += b.vx;
-    b.y += b.vy;
-    b.rot = (b.rot || 0) + (b.rotSpeed || 0);
+    b.x += b.vx * moveScale;
+    b.y += b.vy * moveScale;
+    b.rot = (b.rot || 0) + (b.rotSpeed || 0) * moveScale;
   }
   broccoliList = broccoliList.filter(b => b.x > -40 && b.x < W + 40 && b.y > -40 && b.y < H + 40);
 
   // update burgers
   for (let bg of burgerList) {
     bg.y += bg.vy;
+    if (bg.vx) bg.x += bg.vx;
     bg.wobble = (bg.wobble || 0) + 0.25;
   }
-  burgerList = burgerList.filter(bg => bg.y > -20);
+  burgerList = burgerList.filter(bg => bg.y > -20 && bg.x > -30 && bg.x < W + 30);
 
   // collision: burger vs boss (top area of canvas counts as boss zone)
   for (let bg of burgerList) {
@@ -1288,7 +1464,7 @@ function update() {
           shakeMag = 4;
           dialogue.textContent = "* PARRY! You knock it right back!";
         } else {
-          let dmg = b.wave ? 14 : 10;
+          let dmg = b.wave ? 14 : (b.kernel ? 4 : 10);
           if (player.blocking) dmg *= 0.35;
           playerHp -= dmg;
           b.hit = true;
@@ -1355,25 +1531,34 @@ function draw() {
 
   ctx.clearRect(-10, -10, W + 20, H + 20);
 
+  // frosty tint while Freeze Shake is active
+  if (freezeActive) {
+    ctx.fillStyle = 'rgba(120,200,255,0.12)';
+    ctx.fillRect(0, 0, W, H);
+  }
+
   // battle box border glow
   ctx.strokeStyle = '#ffffff33';
   ctx.strokeRect(1, 1, W-2, H-2);
 
-  // broccoli — each tumbles gently as it flies
+  // floor hazards (drawn under everything else)
+  drawPuddles();
+
+  // broccoli — each tumbles gently as it flies (kernels render smaller)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let b of broccoliList) {
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.rot || 0);
-    ctx.font = '26px serif';
-    ctx.fillText('🥦', 0, 0);
+    ctx.font = b.kernel ? '15px serif' : '26px serif';
+    ctx.fillText(b.kernel ? '🌽' : '🥦', 0, 0);
     ctx.restore();
   }
 
   // burgers (and milkshakes) — slight wobble + faint motion glow
   for (let bg of burgerList) {
-    const sprite = bg.milkshake ? '🥤' : '🍔';
+    const sprite = bg.milkshake ? '🥤' : bg.fry ? '🍟' : '🍔';
     ctx.save();
     ctx.globalAlpha = 0.25;
     ctx.font = bg.big ? '26px serif' : '20px serif';
@@ -1463,6 +1648,17 @@ function draw() {
     ctx.strokeStyle = 'rgba(255,220,60,0.9)';
     ctx.lineWidth = 3;
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // rooted in a ranch puddle — sluggish, dripping indicator
+  if (player.rooted) {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.font = '13px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('🫗', player.r + 6, player.r + 4);
     ctx.restore();
   }
 
