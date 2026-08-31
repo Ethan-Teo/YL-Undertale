@@ -550,7 +550,7 @@ function spawnBroccoli() {
   broccoliList.push({
     x: fromLeft ? -20 : W + 20,
     y: y,
-    vx: (fromLeft ? 1 : -1) * (2.2 + phase * 0.8 + Math.random()),
+    vx: (fromLeft ? 1 : -1) * (1.5 + phase * 0.55 + Math.random() * 0.7),
     vy: (Math.random() - 0.5) * 1.4,
     r: 12,
     homing,
@@ -563,7 +563,7 @@ function spawnBroccoli() {
       x: 20 + Math.random() * (W - 40),
       y: -20,
       vx: (Math.random() - 0.5) * 1.4,
-      vy: 2.2 + phase * 0.8,
+      vy: 1.5 + phase * 0.55,
       r: 12,
       homing: phase >= 3 && Math.random() < 0.3,
       rot: Math.random() * Math.PI * 2,
@@ -634,7 +634,7 @@ function spawnWave() {
       x: spacing * i + spacing / 2,
       y: H + 20,
       vx: 0,
-      vy: -(2.5 + phase * 0.9),
+      vy: -(1.7 + phase * 0.6),
       r: 12,
       homing: false,
       wave: true,
@@ -660,7 +660,7 @@ function updateSpiral() {
   }
   if (spiralActive) {
     if (frame % 3 === 0) {
-      const speed = 2.1 + phase * 0.3;
+      const speed = 1.4 + phase * 0.2;
       broccoliList.push({
         x: W / 2,
         y: 14,
@@ -704,7 +704,7 @@ function updateBurst() {
       const count = 10 + phase * 2;
       for (let i = 0; i < count; i++) {
         const ang = (Math.PI * 2 * i) / count;
-        const speed = 2.4 + phase * 0.35;
+        const speed = 1.6 + phase * 0.25;
         broccoliList.push({
           x: burstState.x,
           y: burstState.y,
@@ -832,7 +832,7 @@ function updateTattleTail() {
       x: tattleTail.lockX,
       y: tattleTail.y + 10,
       vx: 0,
-      vy: 6.5 + phase * 0.6,
+      vy: 4.5 + phase * 0.4,
       r: 13,
       homing: false,
       wave: true, // reuse wave's higher damage
@@ -1135,7 +1135,7 @@ function update() {
   // shooting via QTE — SPACE opens the timing bar, SPACE again locks it in.
   // Only usable while an attack-cycle opening is active.
   if (qteActive) {
-    const qteSpeed = 0.026 + phase * 0.006;
+    const qteSpeed = 0.017 + phase * 0.004;
     qtePos += qteDir * qteSpeed;
     if (qtePos >= 1) { qtePos = 1; qteDir = -1; }
     else if (qtePos <= 0) { qtePos = 0; qteDir = 1; }
@@ -1200,7 +1200,7 @@ function update() {
   // spawn broccoli — paused during an attack-cycle opening
   if (!attackWindowOpen && !qteActive) {
     spawnTimer++;
-    const spawnRate = Math.max(10, 34 - phase * 8);
+    const spawnRate = Math.max(16, 42 - phase * 7);
     if (spawnTimer > spawnRate) {
       spawnBroccoli();
       spawnTimer = 0;
@@ -1236,11 +1236,11 @@ function update() {
     if (b.homing) {
       const dx = player.x - b.x, dy = player.y - b.y;
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      b.vx += (dx / dist) * 0.045;
-      b.vy += (dy / dist) * 0.045;
+      b.vx += (dx / dist) * 0.03;
+      b.vy += (dy / dist) * 0.03;
       // cap homing speed so it stays dodgeable
       const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      const maxSpd = 3.5 + phase * 0.5;
+      const maxSpd = 2.4 + phase * 0.35;
       if (spd > maxSpd) {
         b.vx = (b.vx / spd) * maxSpd;
         b.vy = (b.vy / spd) * maxSpd;
