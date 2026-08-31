@@ -114,6 +114,83 @@
     margin-top: 6px;
     text-align: center;
   }
+  #adminToggle {
+    margin-top: 10px;
+    font-size: 10px;
+    color: #444;
+    cursor: pointer;
+    letter-spacing: 1px;
+    user-select: none;
+  }
+  #adminToggle:hover {
+    color: #888;
+  }
+  #adminLock, #adminPanel {
+    display: none;
+    margin-top: 6px;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    border: 1px dashed #444;
+    padding: 8px;
+    width: 90%;
+    max-width: 380px;
+  }
+  #adminCode {
+    font-family: inherit;
+    background: #111;
+    color: #ffb347;
+    border: 1px solid #666;
+    padding: 4px 8px;
+    font-size: 12px;
+    width: 80px;
+    text-align: center;
+  }
+  #adminError {
+    color: #ff5555;
+    font-size: 11px;
+  }
+  .adminRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+  }
+  .adminLabel {
+    font-size: 10px;
+    color: #888;
+    width: 70px;
+    text-align: right;
+    letter-spacing: 1px;
+  }
+  .admBtn {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-width: 2px;
+    color: #888;
+    border-color: #555;
+  }
+  .admBtn:hover {
+    background: #555;
+    color: #fff;
+  }
+  .adminCheck {
+    font-size: 11px;
+    color: #9fd9ff;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  #admSpeed {
+    width: 100px;
+  }
+  #admSpeedVal {
+    font-size: 11px;
+    color: #ffb347;
+    width: 34px;
+  }
   #comboWrap {
     display: flex;
     align-items: center;
@@ -298,7 +375,51 @@
 
 <div id="status"></div>
 <button id="restartBtn">FIGHT AGAIN</button>
-<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash — shreds broccoli in your path + brief invincibility &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry — punish a hit anytime by knocking it back at the boss &nbsp;|&nbsp; H: use a ketchup packet to heal (grab 🍅 pickups drifting through to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening, but the boss fires back &nbsp;|&nbsp; C: Freeze Shake — slows all broccoli for a few seconds &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a guaranteed-hit milkshake, G for a wide fry spread, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles that root you if you stand in them, the sweeping kernel gatling, and (phase 3) the steam laser!</div>
+<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) the steam beam &nbsp;|&nbsp; Below 10% HP the boss gives up attacking entirely — it just fires beams at random spots while its HP quietly ticks down on its own (0.1% per second), so landing the final hits is up to you!</div>
+
+<div id="adminToggle">⚙ admin</div>
+<div id="adminLock">
+  <input type="password" id="adminCode" placeholder="code" maxlength="8" inputmode="numeric">
+  <button id="adminSubmit" class="actionBtn">unlock</button>
+  <span id="adminError"></span>
+</div>
+<div id="adminPanel">
+  <div class="adminRow">
+    <span class="adminLabel">Boss HP</span>
+    <button class="actionBtn admBtn" data-boss="1">100%</button>
+    <button class="actionBtn admBtn" data-boss="0.5">50%</button>
+    <button class="actionBtn admBtn" data-boss="0.24">25%</button>
+    <button class="actionBtn admBtn" data-boss="0.09">10%</button>
+    <button class="actionBtn admBtn" data-boss="0">Kill</button>
+  </div>
+  <div class="adminRow">
+    <span class="adminLabel">Player HP</span>
+    <button class="actionBtn admBtn" data-player="1">Full</button>
+    <button class="actionBtn admBtn" data-player="0.2">20%</button>
+    <button class="actionBtn admBtn" data-player="0">0 (lose)</button>
+    <label class="adminCheck"><input type="checkbox" id="godModeCheck"> God mode</label>
+  </div>
+  <div class="adminRow">
+    <span class="adminLabel">Resources</span>
+    <button class="actionBtn admBtn" id="admFillHeal">Max ketchup</button>
+    <button class="actionBtn admBtn" id="admFillCombo">Fill ultimate</button>
+  </div>
+  <div class="adminRow">
+    <span class="adminLabel">Force attack</span>
+    <button class="actionBtn admBtn" id="admWave">Wave</button>
+    <button class="actionBtn admBtn" id="admSpiral">Spiral</button>
+    <button class="actionBtn admBtn" id="admBurst">Burst</button>
+    <button class="actionBtn admBtn" id="admLaser">Laser</button>
+    <button class="actionBtn admBtn" id="admGatling">Gatling</button>
+    <button class="actionBtn admBtn" id="admTattle">Tattle Tail</button>
+    <button class="actionBtn admBtn" id="admPuddle">Puddle</button>
+  </div>
+  <div class="adminRow">
+    <span class="adminLabel">Speed</span>
+    <input type="range" id="admSpeed" min="0.1" max="2" step="0.1" value="0.5">
+    <span id="admSpeedVal">0.5x</span>
+  </div>
+</div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -338,6 +459,7 @@ let waveTimer = 0;
 let lastShot = 0;
 let phase = 1;
 let shakeTime = 0;
+let godMode = false; // admin-panel cheat: ignores all incoming damage
 let shakeMag = 0;
 
 // dash / teleport
@@ -425,7 +547,8 @@ const FRY_DMG = 3;
 // --- new boss attacks ---
 let spiralTimer = 0, spiralActive = false, spiralShotsLeft = 0, spiralAngle = 0;
 let burstTimer = 0, burstState = null;   // {x, y, stage:'telegraph'|'fired', timer}
-let laserTimer = 0, laserState = null;   // {x, width, stage:'telegraph'|'active', timer, hit}
+let laserTimer = 0;
+let laserList = []; // multiple beams can be active at once
 
 // KERNEL GATLING — the boss sweeps a rapid stream of corn kernels
 // left-to-right across the top of the box in a sine sweep
@@ -444,6 +567,13 @@ const dialogueLines = [
   "* You feel a floret of dread.",
   "* The broccoli grows angrier!",
   "* It unleashes a coleslaw of chaos!"
+];
+
+const criticalLines = [
+  "* The broccoli won't go down without a fight!",
+  "* It's throwing everything it has left at you!",
+  "* One floret away from defeat... it knows it!",
+  "* The broccoli trembles with desperate rage!"
 ];
 
 const tattleLines = [
@@ -518,7 +648,7 @@ function initGame() {
   burstTimer = 0;
   burstState = null;
   laserTimer = 0;
-  laserState = null;
+  laserList = [];
   gatlingTimer = 0;
   gatlingActive = false;
   gatlingProgress = 0;
@@ -526,6 +656,8 @@ function initGame() {
   puddleList = [];
   puddleTimer = 0;
   phase = 1;
+  bossEmoji.style.transform = 'scale(1)';
+  bossEmoji.style.filter = 'none';
   statusEl.textContent = '';
   restartBtn.style.display = 'none';
   dialogue.textContent = dialogueLines[0];
@@ -692,6 +824,13 @@ function spawnWave() {
 
 // SPIRAL BARRAGE — the boss spins in place, flinging out a rotating
 // fan of broccoli that sweeps around the whole box.
+function bossRestTransform() {
+  if (phase === 1) return 'scale(1)';
+  if (phase === 2) return 'scale(1.15)';
+  if (phase === 3) return 'scale(1.3) rotate(5deg)';
+  return 'scale(1.45) rotate(-6deg)'; // phase 4 — last stand
+}
+
 function updateSpiral() {
   spiralTimer++;
   const interval = Math.max(300, 680 - phase * 110);
@@ -723,7 +862,7 @@ function updateSpiral() {
     if (spiralShotsLeft <= 0) {
       spiralActive = false;
       bossEmoji.style.transition = 'transform 0.1s';
-      bossEmoji.style.transform = phase === 1 ? 'scale(1)' : phase === 2 ? 'scale(1.15)' : 'scale(1.3) rotate(5deg)';
+      bossEmoji.style.transform = bossRestTransform();
     }
   }
 }
@@ -786,55 +925,81 @@ function drawBurst() {
 // STEAM LASER — phase 3 only: a telegraphed vertical column sweeps
 // through, dealing a solid hit if you're still standing in it.
 function updateLaser() {
-  if (phase < 3) return;
+  // normal phase-3+ steam beam — off during the last stand (phase 4
+  // uses updateLastStandBeams instead, which fires far more often)
+  if (phase < 3 || phase === 4) return;
   laserTimer++;
-  const interval = Math.max(380, 700 - phase * 100);
-  if (!laserState && laserTimer > interval) {
+  const interval = Math.max(60, 150 - phase * 18);
+  if (laserTimer > interval) {
     laserTimer = 0;
-    laserState = {
+    laserList.push({
       x: 30 + Math.random() * (W - 60),
       width: 34,
       stage: 'telegraph',
       timer: 0,
       hit: false
-    };
-    dialogue.textContent = "* STEAM LASER incoming — dodge sideways!";
-  }
-  if (laserState) {
-    laserState.timer++;
-    if (laserState.stage === 'telegraph' && laserState.timer > 50) {
-      laserState.stage = 'active';
-      laserState.timer = 0;
-    } else if (laserState.stage === 'active') {
-      if (!laserState.hit && player.invulnTimer <= 0 &&
-          player.x > laserState.x - laserState.width / 2 &&
-          player.x < laserState.x + laserState.width / 2) {
-        playerHp -= player.blocking ? 18 * 0.35 : 18;
-        laserState.hit = true;
-        shakeTime = player.blocking ? 6 : 16;
-        shakeMag = player.blocking ? 3 : 8;
-      }
-      if (laserState.timer > 26) {
-        laserState = null;
-      }
-    }
+    });
+    dialogue.textContent = "* A STEAM BEAM strikes at a random spot!";
   }
 }
 
-function drawLaser() {
-  if (!laserState) return;
-  ctx.save();
-  if (laserState.stage === 'telegraph') {
-    const flicker = 0.15 + 0.25 * Math.abs(Math.sin(laserState.timer * 0.4));
-    ctx.fillStyle = `rgba(255,210,80,${flicker})`;
-    ctx.fillRect(laserState.x - laserState.width / 2, 0, laserState.width, H);
-  } else {
-    ctx.fillStyle = 'rgba(255,240,200,0.85)';
-    ctx.fillRect(laserState.x - laserState.width / 2, 0, laserState.width, H);
-    ctx.fillStyle = 'rgba(255,140,60,0.55)';
-    ctx.fillRect(laserState.x - laserState.width / 2 - 4, 0, laserState.width + 8, H);
+// LAST STAND (phase 4, <10% HP) — every other attack has stopped; the
+// boss just bleeds out on its own while lashing out with random beams
+const BLEED_PERCENT_PER_SEC = 0.001; // 0.1% of max HP per second
+function updateLastStandBeams() {
+  bossHp -= (bossMaxHp * BLEED_PERCENT_PER_SEC) / 60;
+
+  laserTimer++;
+  const interval = 50;
+  if (laserTimer > interval) {
+    laserTimer = 0;
+    laserList.push({
+      x: 20 + Math.random() * (W - 40),
+      width: 26 + Math.random() * 18,
+      stage: 'telegraph',
+      timer: 0,
+      hit: false
+    });
+    dialogue.textContent = "* A wild beam of steam lances out at random!";
   }
-  ctx.restore();
+}
+
+function processLasers() {
+  for (const l of laserList) {
+    l.timer++;
+    if (l.stage === 'telegraph' && l.timer > 45) {
+      l.stage = 'active';
+      l.timer = 0;
+    } else if (l.stage === 'active') {
+      if (!l.hit && player.invulnTimer <= 0 && !godMode &&
+          player.x > l.x - l.width / 2 &&
+          player.x < l.x + l.width / 2) {
+        playerHp -= player.blocking ? 18 * 0.35 : 18;
+        l.hit = true;
+        shakeTime = player.blocking ? 6 : 16;
+        shakeMag = player.blocking ? 3 : 8;
+      }
+      if (l.timer > 22) l.done = true;
+    }
+  }
+  laserList = laserList.filter(l => !l.done);
+}
+
+function drawLaser() {
+  for (const l of laserList) {
+    ctx.save();
+    if (l.stage === 'telegraph') {
+      const flicker = 0.15 + 0.25 * Math.abs(Math.sin(l.timer * 0.4));
+      ctx.fillStyle = `rgba(255,210,80,${flicker})`;
+      ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
+    } else {
+      ctx.fillStyle = 'rgba(255,240,200,0.85)';
+      ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
+      ctx.fillStyle = 'rgba(255,140,60,0.55)';
+      ctx.fillRect(l.x - l.width / 2 - 4, 0, l.width + 8, H);
+    }
+    ctx.restore();
+  }
 }
 
 // KERNEL GATLING — a rapid sweeping stream of small corn kernels
@@ -1365,9 +1530,33 @@ function update() {
     dialogue.textContent = dialogueLines[5];
     bossEmoji.style.transform = 'scale(1.3) rotate(5deg)';
   }
+  if (bossHp < bossMaxHp * 0.1 && phase === 3) {
+    phase = 4;
+    dialogue.textContent = "* The broccoli is DESPERATE! It's melting down — beams lash out at random!";
+    bossEmoji.style.transform = 'scale(1.45) rotate(-6deg)';
+    bossEmoji.style.filter = 'drop-shadow(0 0 16px #ff3030)';
+    shakeTime = 24;
+    shakeMag = 7;
+    // everything else stops cold — only the random beams (and the bleed) remain
+    spiralActive = false;
+    burstState = null;
+    gatlingActive = false;
+    tattleTail = null;
+    puddleList = [];
+    broccoliList = [];
+  }
 
-  // spawn broccoli — paused during an attack-cycle opening
-  if (!attackWindowOpen && !qteActive) {
+  // Below 10% HP (phase 4), the boss stops attacking entirely and just
+  // bleeds out while flinging beams at random spots. Above that, the
+  // normal attack set runs, plus the occasional phase-3+ steam beam.
+  if (phase === 4) {
+    updateLastStandBeams();
+  } else {
+    updateLaser();
+  }
+  processLasers();
+
+  if (!attackWindowOpen && !qteActive && phase < 4) {
     spawnTimer++;
     const spawnRate = Math.max(16, 42 - phase * 7);
     if (spawnTimer > spawnRate) {
@@ -1378,7 +1567,6 @@ function update() {
       }
     }
 
-    // periodic wave attack (wall with a gap) — more frequent each phase
     waveTimer++;
     const waveInterval = Math.max(180, 420 - phase * 90);
     if (waveTimer > waveInterval) {
@@ -1386,14 +1574,11 @@ function update() {
       waveTimer = 0;
     }
 
-    // Tattle Tail minion — snitches on your position, then strikes there
     spawnTattleTailIfDue();
     updateTattleTail();
 
-    // signature boss attacks
     updateSpiral();
     updateBurst();
-    updateLaser();
     updateGatling();
     spawnPuddleIfDue();
   }
@@ -1440,9 +1625,9 @@ function update() {
     if (bg.y < 25) {
       bossHp -= (bg.dmg || 4);
       bg.hit = true;
-      bossEmoji.style.transform = (phase===1?'scale(0.95)':phase===2?'scale(1.1)':'scale(1.25)');
+      bossEmoji.style.transform = (phase===1?'scale(0.95)':phase===2?'scale(1.1)':phase===3?'scale(1.25)':'scale(1.4) rotate(-4deg)');
       setTimeout(() => {
-        bossEmoji.style.transform = (phase===1?'scale(1)':phase===2?'scale(1.15)':'scale(1.3) rotate(5deg)');
+        bossEmoji.style.transform = bossRestTransform();
       }, 80);
     }
   }
@@ -1450,7 +1635,7 @@ function update() {
 
   // collision: broccoli vs player (skipped while dash-invulnerable;
   // reduced while blocking with E; punished back at the boss during a parry)
-  if (player.invulnTimer <= 0) {
+  if (player.invulnTimer <= 0 && !godMode) {
     for (let b of broccoliList) {
       const dx = b.x - player.x, dy = b.y - player.y;
       const dist = Math.sqrt(dx*dx + dy*dy);
@@ -1497,14 +1682,23 @@ let lastTimestamp = null;
 let rafAccumulator = 0;
 const FIXED_STEP = 1000 / 60;
 const MAX_STEPS_PER_FRAME = 5; // avoids a "spiral of death" after tab switches
-const GLOBAL_TIME_SCALE = 0.5; // slows the whole simulation uniformly
+let GLOBAL_TIME_SCALE = 0.5; // slows the whole simulation uniformly (admin-adjustable)
 
 function rafLoop(timestamp) {
   if (lastTimestamp === null) lastTimestamp = timestamp;
-  let delta = (timestamp - lastTimestamp) * GLOBAL_TIME_SCALE;
+  const rawDelta = timestamp - lastTimestamp; // real ms, unaffected by GLOBAL_TIME_SCALE
+  let delta = rawDelta * GLOBAL_TIME_SCALE;
   lastTimestamp = timestamp;
   if (delta > FIXED_STEP * MAX_STEPS_PER_FRAME) delta = FIXED_STEP * MAX_STEPS_PER_FRAME;
   rafAccumulator += delta;
+
+  // passive drain: boss loses 0.1% max HP per real-world second, no
+  // matter what — a slow ticking clock on top of whatever damage you land
+  if (!gameOver && bossHp > 0) {
+    bossHp -= bossMaxHp * 0.001 * (rawDelta / 1000);
+    if (bossHp < 0) bossHp = 0;
+    updateBars();
+  }
 
   let steps = 0;
   while (rafAccumulator >= FIXED_STEP && steps < MAX_STEPS_PER_FRAME) {
@@ -1540,6 +1734,18 @@ function draw() {
   // battle box border glow
   ctx.strokeStyle = '#ffffff33';
   ctx.strokeRect(1, 1, W-2, H-2);
+
+  // last-stand danger vignette — pulsing red edges once the boss is desperate
+  if (phase === 4) {
+    ctx.save();
+    const pulse = 0.18 + 0.18 * Math.abs(Math.sin(frame * 0.12));
+    const grad = ctx.createRadialGradient(W/2, H/2, H*0.35, W/2, H/2, H*0.75);
+    grad.addColorStop(0, 'rgba(255,0,0,0)');
+    grad.addColorStop(1, `rgba(255,20,20,${pulse})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
 
   // floor hazards (drawn under everything else)
   drawPuddles();
@@ -1678,6 +1884,110 @@ function endGame(won) {
 }
 
 restartBtn.addEventListener('click', initGame);
+
+// --- admin panel (code 4334) ---
+const ADMIN_CODE = '4334';
+let adminUnlocked = false;
+const adminToggle = document.getElementById('adminToggle');
+const adminLock = document.getElementById('adminLock');
+const adminPanel = document.getElementById('adminPanel');
+const adminCode = document.getElementById('adminCode');
+const adminSubmit = document.getElementById('adminSubmit');
+const adminError = document.getElementById('adminError');
+
+adminToggle.addEventListener('click', () => {
+  if (adminUnlocked) {
+    adminPanel.style.display = (adminPanel.style.display === 'flex') ? 'none' : 'flex';
+  } else {
+    adminLock.style.display = (adminLock.style.display === 'flex') ? 'none' : 'flex';
+    adminCode.focus();
+  }
+});
+
+function tryUnlockAdmin() {
+  if (adminCode.value === ADMIN_CODE) {
+    adminUnlocked = true;
+    adminLock.style.display = 'none';
+    adminPanel.style.display = 'flex';
+    adminError.textContent = '';
+    adminCode.value = '';
+  } else {
+    adminError.textContent = 'wrong code';
+    adminCode.value = '';
+  }
+}
+adminSubmit.addEventListener('click', tryUnlockAdmin);
+adminCode.addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryUnlockAdmin();
+  e.stopPropagation(); // don't let typing digits trigger game keys
+});
+
+// boss HP quick-set
+document.querySelectorAll('[data-boss]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pct = parseFloat(btn.dataset.boss);
+    bossHp = Math.max(0, Math.min(bossMaxHp, bossMaxHp * pct));
+    updateBars();
+  });
+});
+
+// player HP quick-set
+document.querySelectorAll('[data-player]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pct = parseFloat(btn.dataset.player);
+    playerHp = Math.max(0, Math.min(playerMaxHp, playerMaxHp * pct));
+    updateBars();
+  });
+});
+
+document.getElementById('godModeCheck').addEventListener('change', e => {
+  godMode = e.target.checked;
+});
+
+document.getElementById('admFillHeal').addEventListener('click', () => {
+  healCharges = MAX_HEAL_CHARGES;
+  healText.textContent = '🍅 x' + healCharges;
+});
+document.getElementById('admFillCombo').addEventListener('click', () => {
+  comboMeter = COMBO_MAX;
+  updateComboBar();
+});
+
+document.getElementById('admWave').addEventListener('click', () => spawnWave());
+document.getElementById('admSpiral').addEventListener('click', () => {
+  spiralActive = true;
+  spiralShotsLeft = 20 + phase * 4;
+  spiralAngle = Math.random() * Math.PI * 2;
+  spiralTimer = 0;
+});
+document.getElementById('admBurst').addEventListener('click', () => {
+  burstState = { x: W / 2, y: H / 2, stage: 'telegraph', timer: 0 };
+});
+document.getElementById('admLaser').addEventListener('click', () => {
+  laserList.push({ x: W / 2, width: 34, stage: 'telegraph', timer: 0, hit: false });
+});
+document.getElementById('admGatling').addEventListener('click', () => {
+  gatlingActive = true;
+  gatlingProgress = 0;
+  gatlingShotsLeft = 24 + phase * 5;
+  gatlingTimer = 0;
+});
+document.getElementById('admTattle').addEventListener('click', () => {
+  tattleTail = { x: W / 2, y: 40, state: 'watching', timer: 0, lockX: null, wobble: 0 };
+  tattleTailTimer = 0;
+});
+document.getElementById('admPuddle').addEventListener('click', () => {
+  puddleList.push({ x: W / 2, y: H / 2, r: 24, life: 280 });
+});
+
+const admSpeed = document.getElementById('admSpeed');
+const admSpeedVal = document.getElementById('admSpeedVal');
+admSpeed.value = GLOBAL_TIME_SCALE;
+admSpeedVal.textContent = GLOBAL_TIME_SCALE.toFixed(1) + 'x';
+admSpeed.addEventListener('input', () => {
+  GLOBAL_TIME_SCALE = parseFloat(admSpeed.value);
+  admSpeedVal.textContent = GLOBAL_TIME_SCALE.toFixed(1) + 'x';
+});
 
 initGame();
 </script>
