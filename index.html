@@ -751,7 +751,7 @@ function spawnBroccoli() {
 }
 
 function spawnKetchupIfDue() {
-  ketchupTimer++;
+  ketchupTimer += lastStandSpeedCompensation() * 2; // 2x spawn speed
   if (healCharges >= MAX_HEAL_CHARGES) return; // no point spawning if you're capped
   if (ketchupTimer > KETCHUP_INTERVAL) {
     ketchupTimer = 0;
@@ -769,10 +769,11 @@ function spawnKetchupIfDue() {
 }
 
 function updateKetchup() {
+  const comp = lastStandSpeedCompensation();
   for (const k of ketchupList) {
-    k.x += k.vx;
-    k.bob += 0.08;
-    k.y += Math.sin(k.bob) * 0.4;
+    k.x += k.vx * comp;
+    k.bob += 0.08 * comp;
+    k.y += Math.sin(k.bob) * 0.4 * comp;
     const dx = k.x - player.x, dy = k.y - player.y;
     if (Math.sqrt(dx * dx + dy * dy) < k.r + player.r && !k.collected) {
       k.collected = true;
@@ -825,6 +826,13 @@ function spawnWave() {
 
 // SPIRAL BARRAGE — the boss spins in place, flinging out a rotating
 // fan of broccoli that sweeps around the whole box.
+// The whole simulation runs at GLOBAL_TIME_SCALE real-time speed. Below
+// 10% HP (phase 4), movement-driven things (player, pickups) compensate
+// back up to full 1x real-world speed while beams/timers stay slowed.
+function lastStandSpeedCompensation() {
+  return phase === 4 ? (1 / GLOBAL_TIME_SCALE) : 1;
+}
+
 function bossRestTransform() {
   if (phase === 1) return 'scale(1)';
   if (phase === 2) return 'scale(1.15)';
@@ -926,6 +934,13 @@ function drawBurst() {
 // STEAM LASER — phase 3 only: a telegraphed beam strikes, dealing a
 // solid hit if you're still standing in it. Cycles through a few
 // different patterns for variety.
+// each beam attack costs the boss a little extra HP on top of any
+// passive bleed — firing recklessly speeds up its own downfall
+const BEAM_SELF_DAMAGE_PERCENT = 0.001; // 0.1% of max HP per attack
+function applyBeamSelfDamage() {
+  bossHp -= bossMaxHp * BEAM_SELF_DAMAGE_PERCENT;
+}
+
 function updateLaser() {
   // normal phase-3+ steam beam — off during the last stand (phase 4
   // is fully passive now, see updateLastStandBeams)
@@ -947,6 +962,7 @@ function updateLaser() {
         hit: false
       });
       dialogue.textContent = "* A STEAM BEAM strikes at a random spot!";
+      applyBeamSelfDamage();
 
     } else if (roll < 0.6) {
       // a beam sweeping in as a full-width row instead of a column
@@ -959,6 +975,7 @@ function updateLaser() {
         hit: false
       });
       dialogue.textContent = "* A beam sweeps in sideways!";
+      applyBeamSelfDamage();
 
     } else if (roll < 0.8) {
       // twin beams with a narrow gap between them
@@ -973,6 +990,7 @@ function updateLaser() {
         stage: 'telegraph', timer: 0, hit: false
       });
       dialogue.textContent = "* Twin beams strike — squeeze through the middle!";
+      applyBeamSelfDamage();
 
     } else {
       // rare preview of the full last-stand wall pattern
@@ -989,6 +1007,7 @@ const LASER_WALL_COLS = 7;
 const LASER_WALL_ROWS = 5;
 
 function spawnLaserWave() {
+  applyBeamSelfDamage();
   const pattern = ['v1gap', 'v2gap', 'h1gap', 'h2gap', 'cross', 'doublecross']
     [Math.floor(Math.random() * 6)];
 
@@ -1090,13 +1109,15 @@ function spawnLaserWave() {
 function updateLastStandBeams() {
   // the boss can no longer be fought back against here (openings are
   // closed for good), but it still lashes out with varied beam wall
-  // patterns while it passively bleeds out.
+  // patterns, back to back with no rest, while it passively bleeds out.
   bossHp -= (bossMaxHp * BLEED_PERCENT_PER_SEC) / 60;
 
-  laserTimer++;
-  const interval = 130 / 1.5; // rest between walls, so you get a breather each time (1.5x spawn speed)
-  if (laserTimer > interval && laserList.length === 0) {
-    laserTimer = 0;
+  // start telegraphing the next wave as soon as the current one has
+  // fully committed to firing (no beams still in 'telegraph') — so the
+  // warning outlines for the next wave show up while the current
+  // beams are still actively firing, instead of waiting for them to clear
+  const stillWarning = laserList.some(l => l.stage === 'telegraph');
+  if (!stillWarning) {
     spawnLaserWave();
   }
 }
@@ -1113,7 +1134,8 @@ function processLasers() {
         ? (player.x > l.x - l.width / 2 && player.x < l.x + l.width / 2)
         : (player.y > l.y - l.height / 2 && player.y < l.y + l.height / 2);
       if (!l.hit && player.invulnTimer <= 0 && !godMode && inBeam) {
-        playerHp -= player.blocking ? 18 * 0.35 : 18;
+        const baseDmg = phase === 4 ? 30 : 18; // beams hit harder in the last stand
+        playerHp -= player.blocking ? baseDmg * 0.35 : baseDmg;
         l.hit = true;
         shakeTime = player.blocking ? 6 : 16;
         shakeMag = player.blocking ? 3 : 8;
@@ -1128,29 +1150,87 @@ function drawLaser() {
   for (const l of laserList) {
     ctx.save();
     const orient = l.orientation || 'v';
-    if (orient === 'v') {
-      if (l.stage === 'telegraph') {
-        const flicker = 0.15 + 0.25 * Math.abs(Math.sin(l.timer * 0.4));
-        ctx.fillStyle = `rgba(255,210,80,${flicker})`;
+
+    if (l.stage === 'telegraph') {
+      // pulsing warning zone with an animated marching-ants outline
+      const pulse = 0.3 + 0.35 * Math.abs(Math.sin(l.timer * 0.35));
+      if (orient === 'v') {
+        ctx.fillStyle = `rgba(70,230,110,${pulse * 0.35})`;
         ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
       } else {
-        ctx.fillStyle = 'rgba(255,240,200,0.85)';
-        ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
-        ctx.fillStyle = 'rgba(255,140,60,0.55)';
-        ctx.fillRect(l.x - l.width / 2 - 4, 0, l.width + 8, H);
+        ctx.fillStyle = `rgba(70,230,110,${pulse * 0.35})`;
+        ctx.fillRect(0, l.y - l.height / 2, W, l.height);
       }
+      ctx.save();
+      ctx.strokeStyle = `rgba(140,255,180,${pulse + 0.3})`;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([9, 7]);
+      ctx.lineDashOffset = -frame * 1.6;
+      if (orient === 'v') {
+        ctx.strokeRect(l.x - l.width / 2, 0, l.width, H);
+      } else {
+        ctx.strokeRect(0, l.y - l.height / 2, W, l.height);
+      }
+      ctx.restore();
+
     } else {
-      if (l.stage === 'telegraph') {
-        const flicker = 0.15 + 0.25 * Math.abs(Math.sin(l.timer * 0.4));
-        ctx.fillStyle = `rgba(255,210,80,${flicker})`;
-        ctx.fillRect(0, l.y - l.height / 2, W, l.height);
+      // ACTIVE — layered glow: soft outer bloom, gradient body, hot white core, sparkles
+      ctx.save();
+      ctx.shadowColor = '#3dffa0';
+      ctx.shadowBlur = 28;
+
+      let grad;
+      if (orient === 'v') {
+        grad = ctx.createLinearGradient(l.x - l.width / 2, 0, l.x + l.width / 2, 0);
       } else {
-        ctx.fillStyle = 'rgba(255,240,200,0.85)';
-        ctx.fillRect(0, l.y - l.height / 2, W, l.height);
-        ctx.fillStyle = 'rgba(255,140,60,0.55)';
-        ctx.fillRect(0, l.y - l.height / 2 - 4, W, l.height + 8);
+        grad = ctx.createLinearGradient(0, l.y - l.height / 2, 0, l.y + l.height / 2);
       }
+      grad.addColorStop(0, 'rgba(20,140,70,0)');
+      grad.addColorStop(0.18, 'rgba(50,230,110,0.85)');
+      grad.addColorStop(0.5, 'rgba(230,255,235,1)');
+      grad.addColorStop(0.82, 'rgba(50,230,110,0.85)');
+      grad.addColorStop(1, 'rgba(20,140,70,0)');
+      ctx.fillStyle = grad;
+      if (orient === 'v') {
+        ctx.fillRect(l.x - l.width / 2 - 5, 0, l.width + 10, H);
+      } else {
+        ctx.fillRect(0, l.y - l.height / 2 - 5, W, l.height + 10);
+      }
+      ctx.restore();
+
+      // bright hot core with a subtle shimmer
+      ctx.save();
+      const shimmer = 0.75 + 0.25 * Math.sin(frame * 0.6 + (orient === 'v' ? l.x : l.y));
+      ctx.globalAlpha = shimmer;
+      ctx.fillStyle = '#ffffff';
+      if (orient === 'v') {
+        ctx.fillRect(l.x - 2, 0, 4, H);
+      } else {
+        ctx.fillRect(0, l.y - 2, W, 4);
+      }
+      ctx.restore();
+
+      // sparkle particles streaking along the beam
+      ctx.save();
+      for (let i = 0; i < 5; i++) {
+        const t = (((frame * 4 + i * 53) % 240) / 240);
+        const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(frame * 0.3 + i));
+        ctx.fillStyle = `rgba(255,255,255,${twinkle})`;
+        ctx.beginPath();
+        if (orient === 'v') {
+          const py = t * H;
+          const px = l.x + (((i * 37) % 100) / 100 - 0.5) * l.width * 0.7;
+          ctx.arc(px, py, 1.6, 0, Math.PI * 2);
+        } else {
+          const px = t * W;
+          const py = l.y + (((i * 37) % 100) / 100 - 0.5) * l.height * 0.7;
+          ctx.arc(px, py, 1.6, 0, Math.PI * 2);
+        }
+        ctx.fill();
+      }
+      ctx.restore();
     }
+
     ctx.restore();
   }
 }
@@ -1465,9 +1545,14 @@ function update() {
   player.blocking = !!(keys['e'] || keys['KeyE']);
   player.rooted = playerInPuddle();
   const rootFactor = player.rooted ? 0.28 : 1;
-  const accel = (player.blocking ? 0.45 : 0.9) * rootFactor;
+  // the whole simulation runs at GLOBAL_TIME_SCALE real-time speed, so
+  // movement is normally slowed along with everything else. Below 10%
+  // HP (phase 4), compensate so movement stays at full 1x real-world
+  // speed even though beams/timers keep running at the slower pace.
+  const speedCompensation = lastStandSpeedCompensation();
+  const accel = (player.blocking ? 0.45 : 0.9) * rootFactor * speedCompensation;
   const friction = 0.82;
-  const maxSpeed = (player.blocking ? 1.6 : 3.4) * rootFactor;
+  const maxSpeed = (player.blocking ? 1.6 : 3.4) * rootFactor * speedCompensation;
   let ix = 0, iy = 0;
   if (keys['arrowleft'] || keys['a'] || keys['KeyA']) ix -= 1;
   if (keys['arrowright'] || keys['d'] || keys['KeyD']) ix += 1;
