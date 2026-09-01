@@ -48,11 +48,42 @@
     margin-bottom: 6px;
     text-align: center;
   }
+  #battleWrap {
+    position: relative;
+    display: inline-block;
+  }
   #gameCanvas {
     background: #000;
     border: 5px solid #fff;
     box-shadow: 0 0 20px #fff4;
     transition: border-color 0.2s;
+    display: block;
+  }
+  #turretLayer {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+  }
+  .turretIcon {
+    position: absolute;
+    font-size: 22px;
+    line-height: 1;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 0 0 transparent);
+    transition: filter 0.15s, transform 0.15s;
+  }
+  .turretIcon.firing {
+    filter: drop-shadow(0 0 12px #8cff9c) drop-shadow(0 0 4px #fff);
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  .turretIcon .mount {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 14px;
+    height: 3px;
+    background: #666;
+    transform: translate(-50%, -50%);
+    z-index: -1;
   }
   #hud {
     display: flex;
@@ -332,7 +363,10 @@
   <button id="tattleBtn" class="actionBtn">* TATTLE</button>
 </div>
 
-<canvas id="gameCanvas" width="400" height="300"></canvas>
+<div id="battleWrap">
+  <canvas id="gameCanvas" width="400" height="300"></canvas>
+  <div id="turretLayer"></div>
+</div>
 
 <div id="qteWrap">
   <div id="qteLabel">* SPACE to shoot — SPACE again to time it!</div>
@@ -375,7 +409,7 @@
 
 <div id="status"></div>
 <button id="restartBtn">FIGHT AGAIN</button>
-<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive!</div>
+<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, (phase 2+) broccoli turrets mounted outside the box on the top and sides, firing lock-on beams that track you before committing, or launching heat-seeking missiles, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP the first time triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good. Beat it a second time for the real win.</div>
 
 <div id="adminToggle">⚙ admin</div>
 <div id="adminLock">
@@ -459,6 +493,7 @@ let spawnTimer = 0;
 let waveTimer = 0;
 let lastShot = 0;
 let phase = 1;
+let bossRespawned = false; // checkpoint: the boss gets one revival at 50% HP
 let shakeTime = 0;
 let godMode = false; // admin-panel cheat: ignores all incoming damage
 let shakeMag = 0;
@@ -656,7 +691,9 @@ function initGame() {
   gatlingShotsLeft = 0;
   puddleList = [];
   puddleTimer = 0;
+  initTurrets();
   phase = 1;
+  bossRespawned = false;
   bossEmoji.style.transform = 'scale(1)';
   bossEmoji.style.filter = 'none';
   statusEl.textContent = '';
@@ -952,16 +989,17 @@ function updateLaser() {
     const roll = Math.random();
 
     if (roll < 0.4) {
-      // classic: a single beam at a random spot
+      // classic: a single beam that drifts during its warning, then locks in and fires
       laserList.push({
         orientation: 'v',
         x: 30 + Math.random() * (W - 60),
         width: 34,
         stage: 'telegraph',
         timer: 0,
-        hit: false
+        hit: false,
+        moveSpeed: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 1.2)
       });
-      dialogue.textContent = "* A STEAM BEAM strikes at a random spot!";
+      dialogue.textContent = "* A STEAM BEAM sweeps in, hunting for you!";
       applyBeamSelfDamage();
 
     } else if (roll < 0.6) {
@@ -972,24 +1010,26 @@ function updateLaser() {
         height: 30,
         stage: 'telegraph',
         timer: 0,
-        hit: false
+        hit: false,
+        moveSpeed: (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.0)
       });
-      dialogue.textContent = "* A beam sweeps in sideways!";
+      dialogue.textContent = "* A beam sweeps in sideways, drifting as it charges!";
       applyBeamSelfDamage();
 
     } else if (roll < 0.8) {
-      // twin beams with a narrow gap between them
+      // twin beams with a narrow gap between them, drifting together
       const gapCenter = 60 + Math.random() * (W - 120);
       const gapWidth = 46;
+      const twinSpeed = (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 0.9);
       laserList.push({
         orientation: 'v', x: gapCenter - gapWidth / 2 - 17, width: 34,
-        stage: 'telegraph', timer: 0, hit: false
+        stage: 'telegraph', timer: 0, hit: false, moveSpeed: twinSpeed
       });
       laserList.push({
         orientation: 'v', x: gapCenter + gapWidth / 2 + 17, width: 34,
-        stage: 'telegraph', timer: 0, hit: false
+        stage: 'telegraph', timer: 0, hit: false, moveSpeed: twinSpeed
       });
-      dialogue.textContent = "* Twin beams strike — squeeze through the middle!";
+      dialogue.textContent = "* Twin beams drift in — squeeze through the middle!";
       applyBeamSelfDamage();
 
     } else {
@@ -1125,6 +1165,35 @@ function updateLastStandBeams() {
 function processLasers() {
   for (const l of laserList) {
     l.timer++;
+
+    // beams with a moveSpeed drift/hunt during their warning, then lock
+    // in place the moment they commit to firing
+    if (l.stage === 'telegraph' && l.moveSpeed) {
+      const orient = l.orientation || 'v';
+      if (orient === 'v') {
+        l.x += l.moveSpeed;
+        const minX = l.width / 2 + 4, maxX = W - l.width / 2 - 4;
+        if (l.x < minX) { l.x = minX; l.moveSpeed *= -1; }
+        if (l.x > maxX) { l.x = maxX; l.moveSpeed *= -1; }
+      } else {
+        l.y += l.moveSpeed;
+        const minY = l.height / 2 + 4, maxY = H - l.height / 2 - 4;
+        if (l.y < minY) { l.y = minY; l.moveSpeed *= -1; }
+        if (l.y > maxY) { l.y = maxY; l.moveSpeed *= -1; }
+      }
+    }
+
+    // lock-on turret beams — smoothly track your position while
+    // charging, then commit to wherever you were the instant they fire
+    if (l.stage === 'telegraph' && l.tracking) {
+      const orient = l.orientation || 'v';
+      if (orient === 'v') {
+        l.x += (player.x - l.x) * 0.09;
+      } else {
+        l.y += (player.y - l.y) * 0.09;
+      }
+    }
+
     if (l.stage === 'telegraph' && l.timer > 45) {
       l.stage = 'active';
       l.timer = 0;
@@ -1235,7 +1304,121 @@ function drawLaser() {
   }
 }
 
-// KERNEL GATLING — a rapid sweeping stream of small corn kernels
+// BROCCOLI TURRETS — mounted OUTSIDE the battle box on the top, left,
+// and right edges (Gaster-Blaster style), firing beams in at you,
+// starting phase 2. Rendered as real DOM elements so they can sit
+// visibly outside the canvas instead of being clipped by it.
+const turretLayer = document.getElementById('turretLayer');
+let turrets = [];
+
+function initTurrets() {
+  turretLayer.innerHTML = '';
+  turrets = [];
+
+  const defs = [
+    { side: 'top', frac: 0.2 },
+    { side: 'top', frac: 0.5 },
+    { side: 'top', frac: 0.8 },
+    { side: 'left', frac: 0.35 },
+    { side: 'right', frac: 0.65 }
+  ];
+
+  defs.forEach((def, i) => {
+    const el = document.createElement('div');
+    el.className = 'turretIcon';
+    el.textContent = '🥦';
+    const mount = document.createElement('div');
+    mount.className = 'mount';
+    el.appendChild(mount);
+
+    let beamPos, leftPct, topPct;
+    if (def.side === 'top') {
+      beamPos = W * def.frac;
+      leftPct = def.frac * 100;
+      topPct = 0;
+      el.style.left = leftPct + '%';
+      el.style.top = '-22px';
+      mount.style.transform = 'translate(-50%, -50%) rotate(90deg)';
+    } else if (def.side === 'left') {
+      beamPos = H * def.frac;
+      topPct = def.frac * 100;
+      el.style.left = '-22px';
+      el.style.top = topPct + '%';
+    } else { // right
+      beamPos = H * def.frac;
+      topPct = def.frac * 100;
+      el.style.left = 'calc(100% + 22px)';
+      el.style.top = topPct + '%';
+    }
+
+    turretLayer.appendChild(el);
+    turrets.push({
+      side: def.side,
+      beamPos,
+      cooldown: 70 + i * 35, // stagger so they don't all fire in sync
+      flashTimer: 0,
+      el
+    });
+  });
+}
+
+function updateTurrets() {
+  if (phase < 2 || phase >= 4) return;
+  for (const t of turrets) {
+    if (t.flashTimer > 0) {
+      t.flashTimer--;
+      if (t.flashTimer === 0) t.el.classList.remove('firing');
+    }
+    t.cooldown--;
+    if (t.cooldown <= 0) {
+      if (Math.random() < 0.35) {
+        fireMissileFromTurret(t);
+      } else {
+        // lock-on beam: tracks you during the telegraph, then fires
+        // wherever you were standing the instant it commits
+        if (t.side === 'top') {
+          laserList.push({
+            orientation: 'v', x: t.beamPos, width: 28,
+            stage: 'telegraph', timer: 0, hit: false, tracking: true
+          });
+        } else {
+          laserList.push({
+            orientation: 'h', y: t.beamPos, height: 26,
+            stage: 'telegraph', timer: 0, hit: false, tracking: true
+          });
+        }
+        applyBeamSelfDamage();
+        dialogue.textContent = "* A turret locks on with a tracking beam!";
+      }
+      t.cooldown = Math.max(90, 220 - phase * 30) + Math.random() * 40;
+      t.flashTimer = 20;
+      t.el.classList.add('firing');
+    }
+  }
+}
+
+// heat-seeking missile launched from a turret's position just outside
+// the box, homing in on you once it's inside play
+function fireMissileFromTurret(t) {
+  let x, y, vx, vy;
+  if (t.side === 'top') {
+    x = t.beamPos; y = -14; vx = 0; vy = 1.4;
+  } else if (t.side === 'left') {
+    x = -14; y = t.beamPos; vx = 1.4; vy = 0;
+  } else {
+    x = W + 14; y = t.beamPos; vx = -1.4; vy = 0;
+  }
+  broccoliList.push({
+    x, y, vx, vy, r: 9,
+    homing: true,
+    missile: true,
+    rot: Math.atan2(vy, vx),
+    rotSpeed: 0
+  });
+  applyBeamSelfDamage();
+  dialogue.textContent = "* A turret launches a heat-seeking missile!";
+}
+
 function updateGatling() {
   gatlingTimer++;
   const interval = Math.max(340, 640 - phase * 90);
@@ -1797,6 +1980,10 @@ function update() {
     puddleList = [];
     broccoliList = [];
     laserList = [];
+    for (const t of turrets) {
+      t.flashTimer = 0;
+      t.el.classList.remove('firing');
+    }
     // the player's fighting chance ends here too — close out anything in progress
     attackWindowOpen = false;
     qteActive = false;
@@ -1804,9 +1991,9 @@ function update() {
     canvas.style.borderColor = '#fff';
   }
 
-  // Below 10% HP (phase 4), the boss stops attacking entirely and just
-  // bleeds out while flinging beams at random spots. Above that, the
-  // normal attack set runs, plus the occasional phase-3+ steam beam.
+  // Below 10% HP (phase 4), the boss stops attacking entirely — the
+  // turrets fall silent too — and just bleeds out while its old beam
+  // wall patterns keep flinging in at random spots.
   if (phase === 4) {
     updateLastStandBeams();
   } else {
@@ -1815,30 +2002,35 @@ function update() {
   processLasers();
 
   if (!attackWindowOpen && !qteActive && phase < 4) {
-    spawnTimer++;
-    const spawnRate = Math.max(16, 42 - phase * 7);
-    if (spawnTimer > spawnRate) {
-      spawnBroccoli();
-      spawnTimer = 0;
-      if (Math.random() < 0.15) {
-        dialogue.textContent = dialogueLines[Math.floor(Math.random() * dialogueLines.length)];
+    // after the checkpoint respawn, the boss drops every "normal" attack
+    // and fights purely through its turrets and beams from then on
+    if (!bossRespawned) {
+      spawnTimer++;
+      const spawnRate = Math.max(16, 42 - phase * 7);
+      if (spawnTimer > spawnRate) {
+        spawnBroccoli();
+        spawnTimer = 0;
+        if (Math.random() < 0.15) {
+          dialogue.textContent = dialogueLines[Math.floor(Math.random() * dialogueLines.length)];
+        }
       }
+
+      waveTimer++;
+      const waveInterval = Math.max(180, 420 - phase * 90);
+      if (waveTimer > waveInterval) {
+        spawnWave();
+        waveTimer = 0;
+      }
+
+      spawnTattleTailIfDue();
+      updateTattleTail();
+
+      updateSpiral();
+      updateBurst();
+      updateGatling();
+      spawnPuddleIfDue();
     }
-
-    waveTimer++;
-    const waveInterval = Math.max(180, 420 - phase * 90);
-    if (waveTimer > waveInterval) {
-      spawnWave();
-      waveTimer = 0;
-    }
-
-    spawnTattleTailIfDue();
-    updateTattleTail();
-
-    updateSpiral();
-    updateBurst();
-    updateGatling();
-    spawnPuddleIfDue();
+    updateTurrets();
   }
 
   // puddles persist and can be walked out of even during an opening
@@ -1907,7 +2099,7 @@ function update() {
           shakeMag = 4;
           dialogue.textContent = "* PARRY! You knock it right back!";
         } else {
-          let dmg = b.wave ? 14 : (b.kernel ? 4 : 10);
+          let dmg = b.wave ? 14 : (b.kernel ? 4 : (b.missile ? 13 : 10));
           if (player.blocking) dmg *= 0.35;
           playerHp -= dmg;
           b.hit = true;
@@ -1924,7 +2116,38 @@ function update() {
 
   // win/lose
   if (bossHp <= 0) {
-    endGame(true);
+    if (!bossRespawned) {
+      // CHECKPOINT — the boss comes back at 50% HP instead of dying for good
+      bossRespawned = true;
+      bossHp = bossMaxHp * 0.5;
+      phase = 2;
+      bossEmoji.style.filter = 'none';
+      bossEmoji.style.transform = bossRestTransform();
+      shakeTime = 26;
+      shakeMag = 8;
+      dialogue.textContent = "* CHECKPOINT! The broccoli regenerates and rises again!";
+      statusEl.textContent = '⚡ CHECKPOINT — the broccoli refuses to stay down!';
+      setTimeout(() => { if (!gameOver) statusEl.textContent = ''; }, 2200);
+
+      // clean slate for round two
+      spiralActive = false;
+      burstState = null;
+      gatlingActive = false;
+      tattleTail = null;
+      puddleList = [];
+      broccoliList = [];
+      laserList = [];
+      for (const t of turrets) { t.flashTimer = 0; t.el.classList.remove('firing'); }
+      attackWindowOpen = false;
+      qteActive = false;
+      qteWrap.style.display = 'none';
+      canvas.style.borderColor = '#fff';
+      cycleTimer = 0;
+      spawnTimer = 0;
+      waveTimer = 0;
+    } else {
+      endGame(true);
+    }
   } else if (playerHp <= 0) {
     endGame(false);
   }
@@ -2008,15 +2231,23 @@ function draw() {
   // floor hazards (drawn under everything else)
   drawPuddles();
 
-  // broccoli — each tumbles gently as it flies (kernels render smaller)
+  // broccoli — each tumbles gently as it flies (kernels render smaller,
+  // missiles get a rocket sprite plus a little exhaust trail)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let b of broccoliList) {
+    if (b.missile) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.font = '14px serif';
+      ctx.fillText('🚀', b.x - b.vx * 2.2, b.y - b.vy * 2.2);
+      ctx.restore();
+    }
     ctx.save();
     ctx.translate(b.x, b.y);
-    ctx.rotate(b.rot || 0);
-    ctx.font = b.kernel ? '15px serif' : '26px serif';
-    ctx.fillText(b.kernel ? '🌽' : '🥦', 0, 0);
+    ctx.rotate(b.missile ? Math.atan2(b.vy, b.vx) + Math.PI / 2 : (b.rot || 0));
+    ctx.font = b.kernel ? '15px serif' : (b.missile ? '18px serif' : '26px serif');
+    ctx.fillText(b.kernel ? '🌽' : (b.missile ? '🚀' : '🥦'), 0, 0);
     ctx.restore();
   }
 
