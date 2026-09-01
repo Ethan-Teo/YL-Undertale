@@ -26,7 +26,10 @@
   #bossEmoji {
     font-size: 90px;
     display: inline-block;
-    transition: transform 0.1s;
+    transition: transform 0.1s, opacity 0.5s;
+  }
+  #bossEmoji.portraitGone {
+    opacity: 0;
   }
   @keyframes respawnFlash {
     0%, 100% { filter: none; }
@@ -42,12 +45,40 @@
     background: #500;
     border: 2px solid #fff;
     margin: 8px auto;
+    position: relative;
   }
   #bossHpBarInner {
     height: 100%;
     width: 100%;
     background: linear-gradient(90deg, #ffdd00, #ff8800);
     transition: width 0.15s;
+  }
+  .checkpointMark {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    background: #fff;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  #bossCheckpoints {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .cpPip {
+    width: 10px;
+    height: 10px;
+    background: #6cff8f;
+    border: 1px solid #fff;
+    transform: rotate(45deg);
+    transition: background 0.2s, opacity 0.2s;
+  }
+  .cpPip.used {
+    background: #333;
+    opacity: 0.4;
   }
   #dialogue {
     min-height: 24px;
@@ -71,6 +102,31 @@
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
     pointer-events: none;
+  }
+  #bossFieldSprite {
+    position: absolute;
+    left: 50%;
+    top: -20%;
+    font-size: 34px;
+    line-height: 1;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    display: none;
+    filter: drop-shadow(0 0 10px #6cff8f);
+    transition: filter 0.15s;
+    z-index: 5;
+  }
+  #bossFieldSprite.diveWarning {
+    filter: drop-shadow(0 0 16px #ff3030) drop-shadow(0 0 4px #ffcc33);
+    animation: diveShake 0.12s infinite;
+  }
+  #bossFieldSprite.diving {
+    filter: drop-shadow(0 0 20px #ff1a1a) brightness(1.3);
+    font-size: 40px;
+  }
+  @keyframes diveShake {
+    0%, 100% { margin-left: 0; }
+    50% { margin-left: 3px; }
   }
   .turretIcon {
     position: absolute;
@@ -362,7 +418,11 @@
 
 <div id="bossArea">
   <div id="bossEmoji">🥦</div>
-  <div id="bossHpBarOuter"><div id="bossHpBarInner"></div></div>
+  <div id="bossHpBarOuter">
+    <div id="bossHpBarInner"></div>
+    <div class="checkpointMark" style="left:50%"></div>
+  </div>
+  <div id="bossCheckpoints"></div>
 </div>
 
 <div id="dialogue">* The broccoli glares menacingly.</div>
@@ -374,6 +434,7 @@
 <div id="battleWrap">
   <canvas id="gameCanvas" width="400" height="300"></canvas>
   <div id="turretLayer"></div>
+  <div id="bossFieldSprite">🥦</div>
 </div>
 
 <div id="qteWrap">
@@ -417,7 +478,7 @@
 
 <div id="status"></div>
 <button id="restartBtn">FIGHT AGAIN</button>
-<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP the first time triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good, PLUS the turrets outside the box reveal themselves and start firing lock-on beams and heat-seeking missiles, and the boss itself now fires its own golden stunning beam that snaps to your exact position and can't be outrun — it hits lighter but locks up your controls for a moment. Dashing through it (Q) or blocking (E) are the only ways to avoid the stun. Beat it a second time for the real win.</div>
+<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good, PLUS the turrets outside the box reveal themselves and start firing lock-on beams and heat-seeking missiles, and the boss itself now fires its own golden stunning beam that snaps to your exact position and can't be outrun — it hits lighter but locks up your controls for a moment. Dashing through it (Q) or blocking (E) are the only ways to avoid the stun. This can happen TWICE. The first time is a normal comeback at 50% HP, fighting through turrets and beams. The second (and final) time, the turrets and beams stand down for good, PARRYING NO LONGER WORKS, and a beat kicks in (synced kick/hat drum, a pulse on every downbeat): the broccoli SLAMS down from above the box in a dramatic entrance (screen shake + impact flash), the portrait over the boss bar fading out the instant it lands. From there it can't hurt you at all — no ring bursts, no aimed spreads, no dives, not even a touch — it just wanders around harmlessly while taking 0.2% of its max HP in self-damage every time it would have attacked, with downbeats speeding that up further. Just dodge it and watch it wear itself down for the real win. If YOU die at any point, you don't start over from scratch — dying resumes the fight from the last checkpoint you actually reached (the button will say RETRY FROM CHECKPOINT), so a death in the final round only sends you back to the start of that round, not all the way to round one.</div>
 
 <div id="adminToggle">⚙ admin</div>
 <div id="adminLock">
@@ -471,6 +532,7 @@ const W = canvas.width, H = canvas.height;
 
 const bossEmoji = document.getElementById('bossEmoji');
 const bossHpInner = document.getElementById('bossHpBarInner');
+const bossCheckpoints = document.getElementById('bossCheckpoints');
 const hpInner = document.getElementById('hpBarInner');
 const hpText = document.getElementById('hpText');
 const dialogue = document.getElementById('dialogue');
@@ -501,10 +563,233 @@ let spawnTimer = 0;
 let waveTimer = 0;
 let lastShot = 0;
 let phase = 1;
-let bossRespawned = false; // checkpoint: the boss gets one revival at 50% HP
+let bossRespawnCount = 0; // checkpoint: the boss gets TWO revivals before it's truly over
+const MAX_BOSS_RESPAWNS = 2;
+// persists across a player death — dying resumes from the last checkpoint
+// you actually reached instead of sending you back to the very start.
+// only a true final victory clears this back to 0.
+let savedCheckpointCount = 0;
 let bossBeamTimer = 0; // round 2: the boss itself fires stunning beams
 const BOSS_STUN_BEAM_INTERVAL = 260;
 const BOSS_STUN_DURATION = 45; // frames of lost control on a hit
+
+// --- FINAL ROUND (second respawn only) — a beat-synced overlay ported from
+// a companion prototype. A simple synth kick/hat plays on a fixed clock,
+// the canvas pulses on every downbeat, and downbeats force an extra
+// turret/stun-beam volley on top of whatever's already scheduled.
+let audioCtx = null;
+let beatClockActive = false;
+let beatTickCount = 0;
+const BEAT_INTERVAL_TICKS = 28; // ~128bpm at our 60-tick/sec simulation rate
+function ensureAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { audioCtx = null; }
+  }
+}
+function synthBeep(freq, dur, gain, type) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type || 'square';
+  o.frequency.value = freq;
+  g.gain.value = gain || 0.15;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.stop(audioCtx.currentTime + dur);
+}
+function beatKick() { synthBeep(90, 0.18, 0.3, 'sine'); }
+function beatHat() { synthBeep(2200, 0.03, 0.05, 'square'); }
+function pulseCanvasOnBeat() {
+  canvas.style.boxShadow = '0 0 40px 8px rgba(140,255,180,0.7)';
+  setTimeout(() => {
+    if (!gameOver) canvas.style.boxShadow = '0 0 20px #fff4';
+  }, 90);
+}
+function updateFinalRoundBeat() {
+  if (!beatClockActive) return;
+  beatTickCount++;
+  if (beatTickCount % BEAT_INTERVAL_TICKS !== 0) return;
+  const beatNumber = beatTickCount / BEAT_INTERVAL_TICKS;
+  const isDownbeat = beatNumber % 4 === 0;
+  if (isDownbeat) {
+    beatKick();
+    pulseCanvasOnBeat();
+    kickJelly(14);
+    // downbeat shaves time off the boss's next dive — it comes at you
+    // more often as the beat drives the fight forward
+    if (bossField.diveState === 'idle' && bossField.diveCooldown > 20) {
+      bossField.diveCooldown -= 18;
+    }
+  } else {
+    beatHat();
+    kickJelly(4);
+  }
+}
+
+// BOSS FIELD SPRITE — ported from the companion prototype's slow wander
+// behavior. During the final round, the broccoli itself descends from
+// above the box and drifts to a new spot every few seconds, and brushing
+// against it costs you a little HP. On top of that, it periodically
+// pulls back up off-screen and DIVES straight down at you — a real
+// telegraphed attack, not just passive wandering contact.
+const bossField = {
+  x: W / 2, y: -30, targetX: W / 2, targetY: 100, wanderTimer: 0,
+  descended: false, arrived: false, hitCooldown: 0,
+  diveState: 'idle', diveTimer: 0, diveCooldown: 260, diveTargetX: W / 2,
+  attackTimer: 70, patternIndex: 0
+};
+const FIELD_PATTERN_SEQUENCE = ['ring', 'aim', 'cross', 'homing', 'aim', 'ring'];
+const BOSS_FIELD_MARGIN = 46;
+const BOSS_FIELD_TOUCH_R = 20;
+const DIVE_TELEGRAPH_TICKS = 55;
+const DIVE_SPEED = 5.5;
+const DIVE_RECOVER_SPEED = 2;
+function pickBossFieldWanderTarget() {
+  return {
+    x: BOSS_FIELD_MARGIN + Math.random() * (W - BOSS_FIELD_MARGIN * 2),
+    y: BOSS_FIELD_MARGIN + Math.random() * (H * 0.65 - BOSS_FIELD_MARGIN)
+  };
+}
+function drawBossDiveTelegraph() {
+  if (!beatClockActive || bossField.diveState !== 'telegraph') return;
+  const pulse = 0.25 + 0.3 * Math.abs(Math.sin(bossField.diveTimer * 0.35));
+  ctx.save();
+  ctx.fillStyle = `rgba(255,50,40,${pulse * 0.4})`;
+  ctx.fillRect(bossField.diveTargetX - 22, 0, 44, H);
+  ctx.strokeStyle = `rgba(255,120,60,${pulse + 0.3})`;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.lineDashOffset = -frame * 1.4;
+  ctx.strokeRect(bossField.diveTargetX - 22, 0, 44, H);
+  ctx.restore();
+}
+
+function drawBossLandingFlash() {
+  if (!bossField.landingFlash || bossField.landingFlash <= 0) return;
+  const t = bossField.landingFlash / 22; // 1 -> 0 as it fades
+  ctx.save();
+  ctx.globalAlpha = t;
+  ctx.strokeStyle = '#8cff9c';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(bossField.x, bossField.y, (1 - t) * 55 + 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = t * 0.5;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(bossField.x, bossField.y, (1 - t) * 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function updateBossFieldSprite() {
+  if (!beatClockActive) {
+    bossFieldSprite.style.display = 'none';
+    return;
+  }
+  bossFieldSprite.style.display = 'block';
+
+  if (!bossField.descended) {
+    // ENTRANCE SLAM — a fast, dramatic drop straight down from off-screen,
+    // instead of just drifting in slowly like the normal wander
+    bossField.descended = true;
+    bossField.entering = true;
+    bossField.x = W / 2;
+    bossField.y = -50;
+    bossField.entryTargetY = 105;
+    shakeTime = 10;
+    shakeMag = 3;
+  }
+
+  if (bossField.entering) {
+    bossField.y += 4.4; // fast fall — much quicker than the normal wander drift
+    bossFieldSprite.classList.add('diving'); // reuse the "diving" glow for the slam
+    bossFieldSprite.style.left = (bossField.x / W * 100) + '%';
+    bossFieldSprite.style.top = (bossField.y / H * 100) + '%';
+    if (bossField.y >= bossField.entryTargetY) {
+      bossField.y = bossField.entryTargetY;
+      bossField.entering = false;
+      bossFieldSprite.classList.remove('diving');
+      // impact on landing
+      shakeTime = 20;
+      shakeMag = 9;
+      bossField.landingFlash = 22;
+      const spot = pickBossFieldWanderTarget();
+      bossField.targetX = spot.x;
+      bossField.targetY = spot.y;
+      bossField.wanderTimer = 150 + Math.random() * 110;
+      bossField.arrived = true;
+      bossEmoji.classList.add('portraitGone');
+      dialogue.textContent = "* The broccoli SLAMS down into the arena!";
+    }
+    return; // nothing else runs until the entrance finishes
+  }
+
+  if (bossField.landingFlash > 0) bossField.landingFlash--;
+
+  // --- dive attack — also disabled in favor of self-damage on the same schedule ---
+  if (bossField.diveState === 'idle') {
+    bossField.diveCooldown--;
+    if (bossField.diveCooldown <= 0) {
+      bossHp -= bossMaxHp * 0.002;
+      dialogue.textContent = "* The broccoli winds up to dive... and just hurts itself instead!";
+      shakeTime = 6;
+      shakeMag = 2;
+      bossField.diveCooldown = 240 + Math.random() * 120;
+    }
+  }
+
+  // normal slow wander only runs while not mid-dive
+  if (bossField.diveState === 'idle') {
+    bossField.wanderTimer--;
+    if (bossField.wanderTimer <= 0) {
+      const spot = pickBossFieldWanderTarget();
+      bossField.targetX = spot.x;
+      bossField.targetY = spot.y;
+      bossField.wanderTimer = 150 + Math.random() * 110; // ~2.5–4.3s of drifting between spots
+    }
+    const dx = bossField.targetX - bossField.x, dy = bossField.targetY - bossField.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 1) {
+      const step = Math.min(dist, 0.8); // slow, deliberate drift
+      bossField.x += (dx / dist) * step;
+      bossField.y += (dy / dist) * step;
+    }
+  }
+
+  bossFieldSprite.style.left = (bossField.x / W * 100) + '%';
+  bossFieldSprite.style.top = (bossField.y / H * 100) + '%';
+
+  // FINAL ROUND SELF-DAMAGE — the field boss no longer actually attacks
+  // with ring/aimed/cross/homing patterns. On the same schedule those
+  // would have fired, it instead takes 0.2% of its max HP in self-damage.
+  if (bossField.diveState === 'idle') {
+    bossField.attackTimer--;
+    if (bossField.attackTimer <= 0) {
+      bossField.patternIndex++;
+      bossHp -= bossMaxHp * 0.002;
+      dialogue.textContent = "* The broccoli strains from the effort — it takes damage!";
+      bossField.attackTimer = 55 + Math.random() * 35;
+    }
+  }
+
+  // contact damage is disabled too — during this round the boss can't
+  // hurt you at all, it only damages itself on its old attack schedule
+}
+
+// jelly squash/stretch spring — a little life in the player sprite,
+// driven by the beat during the final round
+const jelly = { stretch: 0, v: 0 };
+function kickJelly(amount) { jelly.v += amount * 0.01; }
+function updateJelly() {
+  const k = 0.055, d = 0.22;
+  const a = -k * jelly.stretch - d * jelly.v;
+  jelly.v += a;
+  jelly.stretch += jelly.v;
+}
+
 let shakeTime = 0;
 let godMode = false; // admin-panel cheat: ignores all incoming damage
 let shakeMag = 0;
@@ -700,14 +985,43 @@ function initGame() {
   gatlingActive = false;
   gatlingProgress = 0;
   gatlingShotsLeft = 0;
+  crossTimer = 0;
+  aimedSpreadTimer = 0;
   puddleList = [];
   puddleTimer = 0;
   initTurrets();
-  turretLayer.style.display = 'none'; // turrets stay hidden until the checkpoint respawn
-  phase = 1;
-  bossRespawned = false;
+  phase = savedCheckpointCount === 0 ? 1 : 2;
+  bossRespawnCount = savedCheckpointCount; // resume from the last checkpoint reached
+  bossHp = savedCheckpointCount === 0 ? bossMaxHp : bossMaxHp * 0.5;
+  // turrets only belong to the "round 2" stretch — hidden before it, and
+  // stood down again once the final round takes over
+  turretLayer.style.display = (savedCheckpointCount >= 1 && savedCheckpointCount < MAX_BOSS_RESPAWNS) ? '' : 'none';
+  buildCheckpointPips();
+  updateCheckpointPips();
   bossBeamTimer = 0;
-  bossEmoji.style.transform = 'scale(1)';
+  beatClockActive = savedCheckpointCount === MAX_BOSS_RESPAWNS; // resume straight into the final round if that's where you left off
+  beatTickCount = 0;
+  bossField.x = W / 2;
+  bossField.y = -30;
+  bossField.descended = false;
+  bossField.entering = false;
+  bossField.entryTargetY = 105;
+  bossField.landingFlash = 0;
+  bossField.arrived = false;
+  bossField.wanderTimer = 0;
+  bossField.hitCooldown = 0;
+  bossField.diveState = 'idle';
+  bossField.diveTimer = 0;
+  bossField.diveCooldown = 260;
+  bossField.attackTimer = 70;
+  bossField.patternIndex = 0;
+  bossFieldSprite.classList.remove('diveWarning', 'diving');
+  bossFieldSprite.style.display = 'none';
+  bossEmoji.classList.remove('portraitGone');
+  jelly.stretch = 0;
+  jelly.v = 0;
+  canvas.style.boxShadow = '0 0 20px #fff4';
+  bossEmoji.style.transform = bossRestTransform();
   bossEmoji.style.filter = 'none';
   statusEl.textContent = '';
   restartBtn.style.display = 'none';
@@ -722,6 +1036,21 @@ function updateBars() {
   bossHpInner.style.width = Math.max(0, (bossHp/bossMaxHp*100)) + '%';
   hpInner.style.width = Math.max(0, (playerHp/playerMaxHp*100)) + '%';
   hpText.textContent = Math.max(0, Math.round(playerHp)) + '/' + playerMaxHp;
+}
+
+function buildCheckpointPips() {
+  bossCheckpoints.innerHTML = '';
+  for (let i = 0; i < MAX_BOSS_RESPAWNS; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'cpPip';
+    bossCheckpoints.appendChild(pip);
+  }
+}
+function updateCheckpointPips() {
+  const pips = bossCheckpoints.querySelectorAll('.cpPip');
+  pips.forEach((pip, i) => {
+    pip.classList.toggle('used', i < bossRespawnCount);
+  });
 }
 
 function updateComboBar() {
@@ -768,7 +1097,7 @@ document.addEventListener('keyup', e => {
 });
 canvas.setAttribute('tabindex', '0');
 canvas.style.outline = 'none';
-canvas.addEventListener('click', () => canvas.focus());
+canvas.addEventListener('click', () => { canvas.focus(); ensureAudio(); });
 window.addEventListener('load', () => canvas.focus());
 
 function spawnBroccoli() {
@@ -798,6 +1127,101 @@ function spawnBroccoli() {
       rotSpeed: (Math.random() - 0.5) * 0.2
     });
   }
+}
+
+// CROSS BURST — ported from the prototype's spawnCross: four lines of
+// florets shoot out N/E/S/W simultaneously from the boss's position
+let crossTimer = 0;
+function spawnCrossBurst(originX, originY) {
+  if (originX === undefined) { originX = W / 2; originY = 16; }
+  const speed = 1.6 + phase * 0.25;
+  const perLine = 5;
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  dirs.forEach(([dx, dy]) => {
+    for (let i = 1; i <= perLine; i++) {
+      broccoliList.push({
+        x: originX + dx * i * 16,
+        y: originY + dy * i * 16,
+        vx: dx * speed,
+        vy: dy * speed,
+        r: 9,
+        homing: false,
+        rot: 0,
+        rotSpeed: 0.15
+      });
+    }
+  });
+  dialogue.textContent = "* The broccoli bursts outward in a cross!";
+}
+function updateCrossBurst() {
+  crossTimer++;
+  const interval = Math.max(260, 480 - phase * 70);
+  if (crossTimer > interval) {
+    crossTimer = 0;
+    spawnCrossBurst();
+  }
+}
+
+// AIMED SPREAD — ported from the prototype's spawnAimedSpread: a narrow
+// fan of shots all aimed at wherever you're standing right now
+let aimedSpreadTimer = 0;
+function spawnAimedSpread(originX, originY) {
+  if (originX === undefined) { originX = W / 2; originY = 16; }
+  const baseAngle = Math.atan2(player.y - originY, player.x - originX);
+  const n = 5;
+  const speed = 2.0 + phase * 0.3;
+  for (let i = 0; i < n; i++) {
+    const a = baseAngle + (i - (n - 1) / 2) * 0.22;
+    broccoliList.push({
+      x: originX,
+      y: originY,
+      vx: Math.cos(a) * speed,
+      vy: Math.sin(a) * speed,
+      r: 9,
+      homing: false,
+      rot: a,
+      rotSpeed: 0
+    });
+  }
+  dialogue.textContent = "* An aimed spread of florets fires right at you!";
+}
+function updateAimedSpread() {
+  aimedSpreadTimer++;
+  const interval = Math.max(150, 300 - phase * 50);
+  if (aimedSpreadTimer > interval) {
+    aimedSpreadTimer = 0;
+    spawnAimedSpread();
+  }
+}
+
+// RING BURST — ported from the prototype's spawnRing: an even ring of
+// florets radiating outward in every direction at once
+function spawnRingBurst(originX, originY, n, speed) {
+  n = n || 10;
+  speed = speed || (1.8 + phase * 0.25);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    broccoliList.push({
+      x: originX, y: originY,
+      vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+      r: 8, homing: false, rot: a, rotSpeed: 0.1
+    });
+  }
+  dialogue.textContent = "* A ring of florets radiates outward!";
+}
+
+// HOMING SEEKER — ported from the prototype's spawnHoming: a single
+// slow-turning seeker, capped at one at a time so it stays fair
+function spawnHomingSeeker(originX, originY) {
+  if (broccoliList.some(b => b.fieldSeeker)) return;
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 1.1 + phase * 0.15;
+  broccoliList.push({
+    x: originX, y: originY,
+    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+    r: 10, homing: true, fieldSeeker: true, rot: angle, rotSpeed: 0
+  });
+  dialogue.textContent = "* A lone seeker breaks off and hunts you down!";
 }
 
 function spawnKetchupIfDue() {
@@ -991,15 +1415,14 @@ function applyBeamSelfDamage() {
   bossHp -= bossMaxHp * BEAM_SELF_DAMAGE_PERCENT;
 }
 
-// BOSS STUN BEAM — round 2 only (after the checkpoint respawn), the
-// boss itself joins in with a beam aimed at wherever you're standing.
-// It hits for less damage than the others, but stuns you on contact —
-// briefly cutting off your controls, which is dangerous with everything
-// else still in the air.
+// BOSS STUN BEAM — active during the first checkpoint round only. Once
+// the final round begins (beatClockActive), the boss itself physically
+// comes down to attack instead, so this beam stands down.
 function updateBossStunBeam() {
-  if (!bossRespawned) return;
+  if (bossRespawnCount < 1 || beatClockActive) return;
   bossBeamTimer++;
-  if (bossBeamTimer > BOSS_STUN_BEAM_INTERVAL) {
+  const interval = Math.max(120, BOSS_STUN_BEAM_INTERVAL - (bossRespawnCount - 1) * 60);
+  if (bossBeamTimer > interval) {
     bossBeamTimer = 0;
     laserList.push({
       orientation: 'v',
@@ -1370,6 +1793,7 @@ function drawLaser() {
 // starting phase 2. Rendered as real DOM elements so they can sit
 // visibly outside the canvas instead of being clipped by it.
 const turretLayer = document.getElementById('turretLayer');
+const bossFieldSprite = document.getElementById('bossFieldSprite');
 let turrets = [];
 
 function initTurrets() {
@@ -1424,7 +1848,9 @@ function initTurrets() {
 }
 
 function updateTurrets() {
-  if (!bossRespawned || phase < 2 || phase >= 4) return;
+  // once the final round kicks off, the boss itself comes down to attack
+  // instead of the turrets — so they stand down for good at that point
+  if (bossRespawnCount < 1 || phase < 2 || phase >= 4 || beatClockActive) return;
   for (const t of turrets) {
     if (t.flashTimer > 0) {
       t.flashTimer--;
@@ -1451,7 +1877,9 @@ function updateTurrets() {
         applyBeamSelfDamage();
         dialogue.textContent = "* A turret locks on with a tracking beam!";
       }
-      t.cooldown = Math.max(90, 220 - phase * 30) + Math.random() * 40;
+      // each further respawn shaves a bit more off the cooldown
+      const respawnBonus = (bossRespawnCount - 1) * 20;
+      t.cooldown = Math.max(60, 220 - phase * 30 - respawnBonus) + Math.random() * 40;
       t.flashTimer = 20;
       t.el.classList.add('firing');
     }
@@ -1854,14 +2282,17 @@ function update() {
   }
   if (player.invulnTimer > 0) player.invulnTimer--;
 
-  // parry (R) — usable anytime, short reflex window
+  // parry (R) — usable anytime EXCEPT during the final round, where the
+  // boss attacks you directly instead of through broccoli you can deflect
   if (parryCooldown > 0) parryCooldown--;
   if (parryActive) {
     parryTimer++;
     if (parryTimer > PARRY_WINDOW_LEN) parryActive = false;
   }
   if (rJustPressed) {
-    if (parryCooldown <= 0) {
+    if (beatClockActive) {
+      dialogue.textContent = "* There's nothing to parry — it's coming for you directly!";
+    } else if (parryCooldown <= 0) {
       parryActive = true;
       parryTimer = 0;
       parryCooldown = PARRY_COOLDOWN_MAX;
@@ -1990,9 +2421,12 @@ function update() {
   }
 
   // ULTIMATE (U) — once the combo meter is full, unleash a huge hit
-  // during an opening instead of the usual burger/milkshake
+  // during an opening instead of the usual burger/milkshake. Disabled
+  // once ANY boss (any round, any respawn) drops to 20% HP or below.
   if (uJustPressed) {
-    if (phase === 4) {
+    if (bossHp <= bossMaxHp * 0.2) {
+      dialogue.textContent = "* The ULTIMATE won't work on it this low — too risky!";
+    } else if (phase === 4) {
       dialogue.textContent = "* There's nothing left to fight — just let it fade.";
     } else if (!qteActive && attackWindowOpen && comboMeter >= COMBO_MAX) {
       unleashUltimate();
@@ -2069,9 +2503,9 @@ function update() {
   processLasers();
 
   if (!attackWindowOpen && !qteActive && phase < 4) {
-    // after the checkpoint respawn, the boss drops every "normal" attack
+    // after the first checkpoint respawn, the boss drops every "normal" attack
     // and fights purely through its turrets and beams from then on
-    if (!bossRespawned) {
+    if (bossRespawnCount < 1) {
       spawnTimer++;
       const spawnRate = Math.max(16, 42 - phase * 7);
       if (spawnTimer > spawnRate) {
@@ -2184,28 +2618,50 @@ function update() {
     broccoliList = broccoliList.filter(b => !b.hit);
   }
 
+  updateFinalRoundBeat();
+  updateBossFieldSprite();
+  updateJelly();
+
   updateBars();
   updateCooldownBars();
 
   // win/lose
   if (bossHp <= 0) {
-    if (!bossRespawned) {
-      // CHECKPOINT — the boss comes back at 50% HP instead of dying for good
-      bossRespawned = true;
+    if (bossRespawnCount < MAX_BOSS_RESPAWNS) {
+      // CHECKPOINT — the boss comes back at 50% HP instead of dying for good.
+      // This can happen up to MAX_BOSS_RESPAWNS times before it's truly over.
+      bossRespawnCount++;
+      savedCheckpointCount = bossRespawnCount; // save progress — a later death resumes from here
+      updateCheckpointPips();
       bossHp = bossMaxHp * 0.5;
       phase = 2;
       bossEmoji.style.filter = 'none';
       bossEmoji.style.transform = bossRestTransform();
       bossEmoji.classList.add('respawnFlash');
       setTimeout(() => bossEmoji.classList.remove('respawnFlash'), 900);
-      shakeTime = 26;
-      shakeMag = 8;
-      dialogue.textContent = "* CHECKPOINT! The broccoli regenerates and rises again!";
-      statusEl.textContent = '⚡ CHECKPOINT — the broccoli refuses to stay down!';
+      shakeTime = 26 + bossRespawnCount * 4;
+      shakeMag = 8 + bossRespawnCount * 2;
+      const respawnLines = [
+        "* CHECKPOINT! The broccoli regenerates and rises again!",
+        "* FINAL CHECKPOINT! It abandons its turrets — now IT comes down to fight you directly!"
+      ];
+      dialogue.textContent = respawnLines[Math.min(bossRespawnCount - 1, respawnLines.length - 1)];
+      statusEl.textContent = `⚡ CHECKPOINT ${bossRespawnCount}/${MAX_BOSS_RESPAWNS} — the broccoli refuses to stay down!`;
       setTimeout(() => { if (!gameOver) statusEl.textContent = ''; }, 2200);
-      turretLayer.style.display = ''; // turrets reveal themselves for round two
+      turretLayer.style.display = ''; // turrets reveal themselves from the first respawn on
 
-      // clean slate for round two
+      // the second (final) respawn kicks on the beat-synced overlay and
+      // stands the turrets down for good — the boss fights you directly now
+      if (bossRespawnCount === MAX_BOSS_RESPAWNS) {
+        beatClockActive = true;
+        beatTickCount = 0;
+        ensureAudio();
+        turretLayer.style.display = 'none';
+        for (const t of turrets) { t.flashTimer = 0; t.el.classList.remove('firing'); }
+        parryActive = false; // parrying stands down along with the turrets
+      }
+
+      // clean slate for the next round
       spiralActive = false;
       burstState = null;
       gatlingActive = false;
@@ -2222,6 +2678,7 @@ function update() {
       spawnTimer = 0;
       waveTimer = 0;
     } else {
+      savedCheckpointCount = 0; // true final win — next game starts fresh from round 1
       endGame(true);
     }
   } else if (playerHp <= 0) {
@@ -2376,6 +2833,8 @@ function draw() {
 
   // signature attack telegraphs/effects
   drawBurst();
+  drawBossDiveTelegraph();
+  drawBossLandingFlash();
   drawLaser();
 
   // player's fading motion trail
@@ -2397,8 +2856,11 @@ function draw() {
   }
   ctx.translate(player.x, player.y);
   ctx.rotate((player.tilt || 0) * Math.PI / 180 * 0.08);
-  const sq = player.squash || 1;
-  ctx.scale(2 - sq, sq);
+  // during the final (second-respawn) round, the beat-synced jelly spring
+  // adds an extra bit of squash/stretch life on top of the usual movement one
+  const beatStretch = beatClockActive ? Math.max(-0.5, Math.min(0.7, jelly.stretch)) : 0;
+  const sq = (player.squash || 1) - beatStretch * 0.4;
+  ctx.scale(2 - sq + beatStretch * 0.4, sq);
   ctx.beginPath();
   ctx.arc(0, 0, player.r, 0, Math.PI * 2);
   ctx.closePath();
@@ -2413,7 +2875,7 @@ function draw() {
   ctx.save();
   ctx.translate(player.x, player.y);
   ctx.rotate((player.tilt || 0) * Math.PI / 180 * 0.08);
-  ctx.scale(2 - sq, sq);
+  ctx.scale(2 - sq + beatStretch * 0.4, sq);
   ctx.beginPath();
   ctx.arc(0, 0, player.r, 0, Math.PI * 2);
   ctx.strokeStyle = '#fff';
@@ -2515,9 +2977,13 @@ function endGame(won) {
   if (won) {
     statusEl.textContent = '🎉 YOU WON! The broccoli has been thoroughly grilled.';
     dialogue.textContent = '* The broccoli wilts in defeat.';
+    restartBtn.textContent = 'FIGHT AGAIN';
   } else {
     statusEl.textContent = '💀 GAME OVER — the broccoli was too nutritious to beat.';
     dialogue.textContent = '* You have been steamed.';
+    restartBtn.textContent = savedCheckpointCount > 0
+      ? `RETRY FROM CHECKPOINT ${savedCheckpointCount}/${MAX_BOSS_RESPAWNS}`
+      : 'FIGHT AGAIN';
   }
 }
 
