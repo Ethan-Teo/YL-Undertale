@@ -375,7 +375,7 @@
 
 <div id="status"></div>
 <button id="restartBtn">FIGHT AGAIN</button>
-<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) the steam beam &nbsp;|&nbsp; Below 10% HP the boss gives up attacking entirely — it just fires beams at random spots while its HP quietly ticks down on its own (0.1% per second), so landing the final hits is up to you!</div>
+<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive!</div>
 
 <div id="adminToggle">⚙ admin</div>
 <div id="adminLock">
@@ -410,6 +410,7 @@
     <button class="actionBtn admBtn" id="admSpiral">Spiral</button>
     <button class="actionBtn admBtn" id="admBurst">Burst</button>
     <button class="actionBtn admBtn" id="admLaser">Laser</button>
+    <button class="actionBtn admBtn" id="admLaserWave">Laser Wave</button>
     <button class="actionBtn admBtn" id="admGatling">Gatling</button>
     <button class="actionBtn admBtn" id="admTattle">Tattle Tail</button>
     <button class="actionBtn admBtn" id="admPuddle">Puddle</button>
@@ -922,45 +923,181 @@ function drawBurst() {
   ctx.restore();
 }
 
-// STEAM LASER — phase 3 only: a telegraphed vertical column sweeps
-// through, dealing a solid hit if you're still standing in it.
+// STEAM LASER — phase 3 only: a telegraphed beam strikes, dealing a
+// solid hit if you're still standing in it. Cycles through a few
+// different patterns for variety.
 function updateLaser() {
   // normal phase-3+ steam beam — off during the last stand (phase 4
-  // uses updateLastStandBeams instead, which fires far more often)
+  // is fully passive now, see updateLastStandBeams)
   if (phase < 3 || phase === 4) return;
   laserTimer++;
-  const interval = Math.max(60, 150 - phase * 18);
+  const interval = Math.max(40, (150 - phase * 18) / 1.5); // 1.5x spawn speed
   if (laserTimer > interval) {
     laserTimer = 0;
-    laserList.push({
-      x: 30 + Math.random() * (W - 60),
-      width: 34,
-      stage: 'telegraph',
-      timer: 0,
-      hit: false
-    });
-    dialogue.textContent = "* A STEAM BEAM strikes at a random spot!";
+    const roll = Math.random();
+
+    if (roll < 0.4) {
+      // classic: a single beam at a random spot
+      laserList.push({
+        orientation: 'v',
+        x: 30 + Math.random() * (W - 60),
+        width: 34,
+        stage: 'telegraph',
+        timer: 0,
+        hit: false
+      });
+      dialogue.textContent = "* A STEAM BEAM strikes at a random spot!";
+
+    } else if (roll < 0.6) {
+      // a beam sweeping in as a full-width row instead of a column
+      laserList.push({
+        orientation: 'h',
+        y: 40 + Math.random() * (H - 80),
+        height: 30,
+        stage: 'telegraph',
+        timer: 0,
+        hit: false
+      });
+      dialogue.textContent = "* A beam sweeps in sideways!";
+
+    } else if (roll < 0.8) {
+      // twin beams with a narrow gap between them
+      const gapCenter = 60 + Math.random() * (W - 120);
+      const gapWidth = 46;
+      laserList.push({
+        orientation: 'v', x: gapCenter - gapWidth / 2 - 17, width: 34,
+        stage: 'telegraph', timer: 0, hit: false
+      });
+      laserList.push({
+        orientation: 'v', x: gapCenter + gapWidth / 2 + 17, width: 34,
+        stage: 'telegraph', timer: 0, hit: false
+      });
+      dialogue.textContent = "* Twin beams strike — squeeze through the middle!";
+
+    } else {
+      // rare preview of the full last-stand wall pattern
+      spawnLaserWave();
+    }
   }
 }
 
 // LAST STAND (phase 4, <10% HP) — every other attack has stopped; the
-// boss just bleeds out on its own while lashing out with random beams
+// boss just bleeds out on its own while flooding the screen with beam
+// walls in a variety of patterns, always leaving a safe way through
 const BLEED_PERCENT_PER_SEC = 0.001; // 0.1% of max HP per second
-function updateLastStandBeams() {
-  bossHp -= (bossMaxHp * BLEED_PERCENT_PER_SEC) / 60;
+const LASER_WALL_COLS = 7;
+const LASER_WALL_ROWS = 5;
 
-  laserTimer++;
-  const interval = 50;
-  if (laserTimer > interval) {
-    laserTimer = 0;
+function spawnLaserWave() {
+  const pattern = ['v1gap', 'v2gap', 'h1gap', 'h2gap', 'cross', 'doublecross']
+    [Math.floor(Math.random() * 6)];
+
+  if (pattern === 'v1gap' || pattern === 'v2gap') {
+    const gapCount = pattern === 'v2gap' ? 2 : 1;
+    const colWidth = W / LASER_WALL_COLS;
+    const gaps = new Set();
+    while (gaps.size < gapCount) gaps.add(Math.floor(Math.random() * LASER_WALL_COLS));
+    for (let i = 0; i < LASER_WALL_COLS; i++) {
+      if (gaps.has(i)) continue;
+      laserList.push({
+        orientation: 'v',
+        x: colWidth * i + colWidth / 2,
+        width: colWidth * 0.9,
+        stage: 'telegraph',
+        timer: 0,
+        hit: false
+      });
+    }
+    dialogue.textContent = gapCount === 2
+      ? "* Two gaps in the beam wall — pick one!"
+      : "* The boss floods the screen with beams — find the gap!";
+
+  } else if (pattern === 'h1gap' || pattern === 'h2gap') {
+    const gapCount = pattern === 'h2gap' ? 2 : 1;
+    const rowHeight = H / LASER_WALL_ROWS;
+    const gaps = new Set();
+    while (gaps.size < gapCount) gaps.add(Math.floor(Math.random() * LASER_WALL_ROWS));
+    for (let i = 0; i < LASER_WALL_ROWS; i++) {
+      if (gaps.has(i)) continue;
+      laserList.push({
+        orientation: 'h',
+        y: rowHeight * i + rowHeight / 2,
+        height: rowHeight * 0.85,
+        stage: 'telegraph',
+        timer: 0,
+        hit: false
+      });
+    }
+    dialogue.textContent = gapCount === 2
+      ? "* Two safe rows this time — take your pick!"
+      : "* Beams sweep sideways — find the safe row!";
+
+  } else if (pattern === 'cross') {
+    const colWidth = W / LASER_WALL_COLS;
+    const colIndex = Math.floor(Math.random() * LASER_WALL_COLS);
     laserList.push({
-      x: 20 + Math.random() * (W - 40),
-      width: 26 + Math.random() * 18,
+      orientation: 'v',
+      x: colWidth * colIndex + colWidth / 2,
+      width: colWidth * 1.1,
       stage: 'telegraph',
       timer: 0,
       hit: false
     });
-    dialogue.textContent = "* A wild beam of steam lances out at random!";
+    const rowHeight = H / LASER_WALL_ROWS;
+    const rowIndex = Math.floor(Math.random() * LASER_WALL_ROWS);
+    laserList.push({
+      orientation: 'h',
+      y: rowHeight * rowIndex + rowHeight / 2,
+      height: rowHeight * 1.1,
+      stage: 'telegraph',
+      timer: 0,
+      hit: false
+    });
+    dialogue.textContent = "* A cross of beams cuts through — dodge into a corner!";
+
+  } else if (pattern === 'doublecross') {
+    // two crosses at once — four beams total, only small pockets stay safe
+    const colWidth = W / LASER_WALL_COLS;
+    const rowHeight = H / LASER_WALL_ROWS;
+    const colIndexes = new Set();
+    while (colIndexes.size < 2) colIndexes.add(Math.floor(Math.random() * LASER_WALL_COLS));
+    const rowIndexes = new Set();
+    while (rowIndexes.size < 2) rowIndexes.add(Math.floor(Math.random() * LASER_WALL_ROWS));
+    for (const ci of colIndexes) {
+      laserList.push({
+        orientation: 'v',
+        x: colWidth * ci + colWidth / 2,
+        width: colWidth * 1.1,
+        stage: 'telegraph',
+        timer: 0,
+        hit: false
+      });
+    }
+    for (const ri of rowIndexes) {
+      laserList.push({
+        orientation: 'h',
+        y: rowHeight * ri + rowHeight / 2,
+        height: rowHeight * 1.1,
+        stage: 'telegraph',
+        timer: 0,
+        hit: false
+      });
+    }
+    dialogue.textContent = "* Beams crisscross the whole screen — find a pocket!";
+  }
+}
+
+function updateLastStandBeams() {
+  // the boss can no longer be fought back against here (openings are
+  // closed for good), but it still lashes out with varied beam wall
+  // patterns while it passively bleeds out.
+  bossHp -= (bossMaxHp * BLEED_PERCENT_PER_SEC) / 60;
+
+  laserTimer++;
+  const interval = 130 / 1.5; // rest between walls, so you get a breather each time (1.5x spawn speed)
+  if (laserTimer > interval && laserList.length === 0) {
+    laserTimer = 0;
+    spawnLaserWave();
   }
 }
 
@@ -971,9 +1108,11 @@ function processLasers() {
       l.stage = 'active';
       l.timer = 0;
     } else if (l.stage === 'active') {
-      if (!l.hit && player.invulnTimer <= 0 && !godMode &&
-          player.x > l.x - l.width / 2 &&
-          player.x < l.x + l.width / 2) {
+      const orient = l.orientation || 'v';
+      const inBeam = orient === 'v'
+        ? (player.x > l.x - l.width / 2 && player.x < l.x + l.width / 2)
+        : (player.y > l.y - l.height / 2 && player.y < l.y + l.height / 2);
+      if (!l.hit && player.invulnTimer <= 0 && !godMode && inBeam) {
         playerHp -= player.blocking ? 18 * 0.35 : 18;
         l.hit = true;
         shakeTime = player.blocking ? 6 : 16;
@@ -988,15 +1127,29 @@ function processLasers() {
 function drawLaser() {
   for (const l of laserList) {
     ctx.save();
-    if (l.stage === 'telegraph') {
-      const flicker = 0.15 + 0.25 * Math.abs(Math.sin(l.timer * 0.4));
-      ctx.fillStyle = `rgba(255,210,80,${flicker})`;
-      ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
+    const orient = l.orientation || 'v';
+    if (orient === 'v') {
+      if (l.stage === 'telegraph') {
+        const flicker = 0.15 + 0.25 * Math.abs(Math.sin(l.timer * 0.4));
+        ctx.fillStyle = `rgba(255,210,80,${flicker})`;
+        ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
+      } else {
+        ctx.fillStyle = 'rgba(255,240,200,0.85)';
+        ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
+        ctx.fillStyle = 'rgba(255,140,60,0.55)';
+        ctx.fillRect(l.x - l.width / 2 - 4, 0, l.width + 8, H);
+      }
     } else {
-      ctx.fillStyle = 'rgba(255,240,200,0.85)';
-      ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
-      ctx.fillStyle = 'rgba(255,140,60,0.55)';
-      ctx.fillRect(l.x - l.width / 2 - 4, 0, l.width + 8, H);
+      if (l.stage === 'telegraph') {
+        const flicker = 0.15 + 0.25 * Math.abs(Math.sin(l.timer * 0.4));
+        ctx.fillStyle = `rgba(255,210,80,${flicker})`;
+        ctx.fillRect(0, l.y - l.height / 2, W, l.height);
+      } else {
+        ctx.fillStyle = 'rgba(255,240,200,0.85)';
+        ctx.fillRect(0, l.y - l.height / 2, W, l.height);
+        ctx.fillStyle = 'rgba(255,140,60,0.55)';
+        ctx.fillRect(0, l.y - l.height / 2 - 4, W, l.height + 8);
+      }
     }
     ctx.restore();
   }
@@ -1403,7 +1556,9 @@ function update() {
   // taunt (T) — rushes the next opening closer, but the boss fires back
   if (tauntCooldown > 0) tauntCooldown--;
   if (tJustPressed) {
-    if (tauntCooldown <= 0 && !attackWindowOpen && !qteActive) {
+    if (phase === 4) {
+      dialogue.textContent = "* It's not even listening anymore.";
+    } else if (tauntCooldown <= 0 && !attackWindowOpen && !qteActive) {
       cycleTimer = Math.min(CYCLE_LENGTH, cycleTimer + TAUNT_CYCLE_SKIP);
       tauntCooldown = TAUNT_COOLDOWN_MAX;
       spawnBroccoli();
@@ -1435,27 +1590,31 @@ function update() {
   }
 
   // attack cycle — the boss attacks for a while, then opens up and
-  // gives you a brief window where you're allowed to fight back
-  if (!attackWindowOpen && !qteActive) {
-    cycleTimer++;
-    if (cycleTimer >= CYCLE_LENGTH) {
-      cycleTimer = 0;
-      attackWindowOpen = true;
-      attackWindowTimer = 0;
-      canvas.style.borderColor = '#ffcc33';
-      dialogue.textContent = "* An OPENING! Press SPACE to attack!";
-    }
-  } else if (attackWindowOpen && !qteActive) {
-    attackWindowTimer++;
-    if (attackWindowTimer >= WINDOW_LENGTH) {
-      attackWindowOpen = false;
-      canvas.style.borderColor = '#fff';
-      dialogue.textContent = "* The opening closed.";
+  // gives you a brief window where you're allowed to fight back.
+  // Once it's in its last stand (phase 4), it's given up fighting, so
+  // there's nothing left to counter and no openings are offered.
+  if (phase < 4) {
+    if (!attackWindowOpen && !qteActive) {
+      cycleTimer++;
+      if (cycleTimer >= CYCLE_LENGTH) {
+        cycleTimer = 0;
+        attackWindowOpen = true;
+        attackWindowTimer = 0;
+        canvas.style.borderColor = '#ffcc33';
+        dialogue.textContent = "* An OPENING! Press SPACE to attack!";
+      }
+    } else if (attackWindowOpen && !qteActive) {
+      attackWindowTimer++;
+      if (attackWindowTimer >= WINDOW_LENGTH) {
+        attackWindowOpen = false;
+        canvas.style.borderColor = '#fff';
+        dialogue.textContent = "* The opening closed.";
+      }
     }
   }
 
   // shooting via QTE — SPACE opens the timing bar, SPACE again locks it in.
-  // Only usable while an attack-cycle opening is active.
+  // Only usable while an attack-cycle opening is active (never during phase 4).
   if (qteActive) {
     const qteSpeed = 0.017 + phase * 0.004;
     qtePos += qteDir * qteSpeed;
@@ -1465,7 +1624,9 @@ function update() {
   }
   if (shotCooldown > 0) shotCooldown--;
   if (spaceJustPressed) {
-    if (!qteActive) {
+    if (phase === 4) {
+      dialogue.textContent = "* There's nothing left to fight — just let it fade.";
+    } else if (!qteActive) {
       if (attackWindowOpen && shotCooldown <= 0) {
         startQTE();
         attackWindowOpen = false;
@@ -1482,7 +1643,9 @@ function update() {
   // MILKSHAKE TOSS (F) — an alternate opening move: no timing needed,
   // guaranteed to land, but weaker than a well-timed burger
   if (fJustPressed) {
-    if (!qteActive && attackWindowOpen && shotCooldown <= 0) {
+    if (phase === 4) {
+      dialogue.textContent = "* There's nothing left to fight — just let it fade.";
+    } else if (!qteActive && attackWindowOpen && shotCooldown <= 0) {
       throwMilkshake();
       attackWindowOpen = false;
       canvas.style.borderColor = '#fff';
@@ -1495,7 +1658,9 @@ function update() {
   // ULTIMATE (U) — once the combo meter is full, unleash a huge hit
   // during an opening instead of the usual burger/milkshake
   if (uJustPressed) {
-    if (!qteActive && attackWindowOpen && comboMeter >= COMBO_MAX) {
+    if (phase === 4) {
+      dialogue.textContent = "* There's nothing left to fight — just let it fade.";
+    } else if (!qteActive && attackWindowOpen && comboMeter >= COMBO_MAX) {
       unleashUltimate();
       attackWindowOpen = false;
       canvas.style.borderColor = '#fff';
@@ -1509,7 +1674,9 @@ function update() {
 
   // FRY SPREAD (G) — a third opening move: a wide fan of weaker shots
   if (gJustPressed) {
-    if (!qteActive && attackWindowOpen && shotCooldown <= 0) {
+    if (phase === 4) {
+      dialogue.textContent = "* There's nothing left to fight — just let it fade.";
+    } else if (!qteActive && attackWindowOpen && shotCooldown <= 0) {
       throwFrySpread();
       attackWindowOpen = false;
       canvas.style.borderColor = '#fff';
@@ -1532,18 +1699,24 @@ function update() {
   }
   if (bossHp < bossMaxHp * 0.1 && phase === 3) {
     phase = 4;
-    dialogue.textContent = "* The broccoli is DESPERATE! It's melting down — beams lash out at random!";
+    dialogue.textContent = "* The broccoli is DESPERATE! It gives up the fight — just hanging on now...";
     bossEmoji.style.transform = 'scale(1.45) rotate(-6deg)';
     bossEmoji.style.filter = 'drop-shadow(0 0 16px #ff3030)';
     shakeTime = 24;
     shakeMag = 7;
-    // everything else stops cold — only the random beams (and the bleed) remain
+    // every attack stops cold — only the passive HP bleed remains
     spiralActive = false;
     burstState = null;
     gatlingActive = false;
     tattleTail = null;
     puddleList = [];
     broccoliList = [];
+    laserList = [];
+    // the player's fighting chance ends here too — close out anything in progress
+    attackWindowOpen = false;
+    qteActive = false;
+    qteWrap.style.display = 'none';
+    canvas.style.borderColor = '#fff';
   }
 
   // Below 10% HP (phase 4), the boss stops attacking entirely and just
@@ -1964,7 +2137,11 @@ document.getElementById('admBurst').addEventListener('click', () => {
   burstState = { x: W / 2, y: H / 2, stage: 'telegraph', timer: 0 };
 });
 document.getElementById('admLaser').addEventListener('click', () => {
-  laserList.push({ x: W / 2, width: 34, stage: 'telegraph', timer: 0, hit: false });
+  laserList.push({ orientation: 'v', x: W / 2, width: 34, stage: 'telegraph', timer: 0, hit: false });
+});
+document.getElementById('admLaserWave').addEventListener('click', () => {
+  laserList = [];
+  spawnLaserWave();
 });
 document.getElementById('admGatling').addEventListener('click', () => {
   gatlingActive = true;
