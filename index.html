@@ -28,6 +28,14 @@
     display: inline-block;
     transition: transform 0.1s;
   }
+  @keyframes respawnFlash {
+    0%, 100% { filter: none; }
+    15%, 45%, 75% { filter: drop-shadow(0 0 22px #ff1a1a) brightness(2.2) saturate(3); }
+    30%, 60%, 90% { filter: none; }
+  }
+  #bossEmoji.respawnFlash {
+    animation: respawnFlash 0.9s ease-in-out;
+  }
   #bossHpBarOuter {
     width: 300px;
     height: 18px;
@@ -409,7 +417,7 @@
 
 <div id="status"></div>
 <button id="restartBtn">FIGHT AGAIN</button>
-<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, (phase 2+) broccoli turrets mounted outside the box on the top and sides, firing lock-on beams that track you before committing, or launching heat-seeking missiles, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP the first time triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good. Beat it a second time for the real win.</div>
+<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP the first time triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good, PLUS the turrets outside the box reveal themselves and start firing lock-on beams and heat-seeking missiles, and the boss itself now fires its own golden stunning beam that snaps to your exact position and can't be outrun — it hits lighter but locks up your controls for a moment. Dashing through it (Q) or blocking (E) are the only ways to avoid the stun. Beat it a second time for the real win.</div>
 
 <div id="adminToggle">⚙ admin</div>
 <div id="adminLock">
@@ -494,6 +502,9 @@ let waveTimer = 0;
 let lastShot = 0;
 let phase = 1;
 let bossRespawned = false; // checkpoint: the boss gets one revival at 50% HP
+let bossBeamTimer = 0; // round 2: the boss itself fires stunning beams
+const BOSS_STUN_BEAM_INTERVAL = 260;
+const BOSS_STUN_DURATION = 45; // frames of lost control on a hit
 let shakeTime = 0;
 let godMode = false; // admin-panel cheat: ignores all incoming damage
 let shakeMag = 0;
@@ -628,7 +639,7 @@ tattleBtn.addEventListener('click', () => {
 });
 
 function initGame() {
-  player = { x: W/2, y: H - 30, r: 10, speed: 3, vx: 0, vy: 0, tilt: 0, squash: 1, trail: [], facingX: 0, facingY: -1, invulnTimer: 0, blocking: false, rooted: false };
+  player = { x: W/2, y: H - 30, r: 10, speed: 3, vx: 0, vy: 0, tilt: 0, squash: 1, trail: [], facingX: 0, facingY: -1, invulnTimer: 0, blocking: false, rooted: false, stunTimer: 0 };
   broccoliList = [];
   burgerList = [];
   bossMaxHp = 200;
@@ -692,8 +703,10 @@ function initGame() {
   puddleList = [];
   puddleTimer = 0;
   initTurrets();
+  turretLayer.style.display = 'none'; // turrets stay hidden until the checkpoint respawn
   phase = 1;
   bossRespawned = false;
+  bossBeamTimer = 0;
   bossEmoji.style.transform = 'scale(1)';
   bossEmoji.style.filter = 'none';
   statusEl.textContent = '';
@@ -978,6 +991,34 @@ function applyBeamSelfDamage() {
   bossHp -= bossMaxHp * BEAM_SELF_DAMAGE_PERCENT;
 }
 
+// BOSS STUN BEAM — round 2 only (after the checkpoint respawn), the
+// boss itself joins in with a beam aimed at wherever you're standing.
+// It hits for less damage than the others, but stuns you on contact —
+// briefly cutting off your controls, which is dangerous with everything
+// else still in the air.
+function updateBossStunBeam() {
+  if (!bossRespawned) return;
+  bossBeamTimer++;
+  if (bossBeamTimer > BOSS_STUN_BEAM_INTERVAL) {
+    bossBeamTimer = 0;
+    laserList.push({
+      orientation: 'v',
+      x: player.x,
+      width: 30,
+      stage: 'telegraph',
+      timer: 0,
+      hit: false,
+      stun: true
+    });
+    applyBeamSelfDamage();
+    dialogue.textContent = "* The boss itself charges a STUNNING BEAM!";
+    bossEmoji.style.filter = 'drop-shadow(0 0 16px #ffe066)';
+    setTimeout(() => {
+      if (!gameOver && phase !== 4) bossEmoji.style.filter = 'none';
+    }, 500);
+  }
+}
+
 function updateLaser() {
   // normal phase-3+ steam beam — off during the last stand (phase 4
   // is fully passive now, see updateLastStandBeams)
@@ -1166,6 +1207,18 @@ function processLasers() {
   for (const l of laserList) {
     l.timer++;
 
+    // the boss's own stun beam is inescapable — it snaps to your exact
+    // position every frame, through telegraph AND while active, so
+    // there's no way to outrun it by moving. Only a dash's invincibility
+    // frames, god mode, or blocking (which cancels the stun) save you.
+    if (l.stun) {
+      if (l.orientation === 'v') {
+        l.x = player.x;
+      } else {
+        l.y = player.y;
+      }
+    }
+
     // beams with a moveSpeed drift/hunt during their warning, then lock
     // in place the moment they commit to firing
     if (l.stage === 'telegraph' && l.moveSpeed) {
@@ -1203,11 +1256,14 @@ function processLasers() {
         ? (player.x > l.x - l.width / 2 && player.x < l.x + l.width / 2)
         : (player.y > l.y - l.height / 2 && player.y < l.y + l.height / 2);
       if (!l.hit && player.invulnTimer <= 0 && !godMode && inBeam) {
-        const baseDmg = phase === 4 ? 30 : 18; // beams hit harder in the last stand
+        const baseDmg = l.stun ? 8 : (phase === 4 ? 30 : 18); // stun beams hit lighter but disable you
         playerHp -= player.blocking ? baseDmg * 0.35 : baseDmg;
         l.hit = true;
         shakeTime = player.blocking ? 6 : 16;
         shakeMag = player.blocking ? 3 : 8;
+        if (l.stun && !player.blocking) {
+          player.stunTimer = BOSS_STUN_DURATION;
+        }
       }
       if (l.timer > 22) l.done = true;
     }
@@ -1219,19 +1275,24 @@ function drawLaser() {
   for (const l of laserList) {
     ctx.save();
     const orient = l.orientation || 'v';
+    const stunColors = l.stun
+      ? { warnFill: '255,210,60', warnStroke: '255,235,140', glow: '#ffcc33',
+          g0: 'rgba(150,100,0,0)', g1: 'rgba(255,190,40,0.85)', g2: 'rgba(255,250,220,1)' }
+      : { warnFill: '70,230,110', warnStroke: '140,255,180', glow: '#3dffa0',
+          g0: 'rgba(20,140,70,0)', g1: 'rgba(50,230,110,0.85)', g2: 'rgba(230,255,235,1)' };
 
     if (l.stage === 'telegraph') {
       // pulsing warning zone with an animated marching-ants outline
       const pulse = 0.3 + 0.35 * Math.abs(Math.sin(l.timer * 0.35));
       if (orient === 'v') {
-        ctx.fillStyle = `rgba(70,230,110,${pulse * 0.35})`;
+        ctx.fillStyle = `rgba(${stunColors.warnFill},${pulse * 0.35})`;
         ctx.fillRect(l.x - l.width / 2, 0, l.width, H);
       } else {
-        ctx.fillStyle = `rgba(70,230,110,${pulse * 0.35})`;
+        ctx.fillStyle = `rgba(${stunColors.warnFill},${pulse * 0.35})`;
         ctx.fillRect(0, l.y - l.height / 2, W, l.height);
       }
       ctx.save();
-      ctx.strokeStyle = `rgba(140,255,180,${pulse + 0.3})`;
+      ctx.strokeStyle = `rgba(${stunColors.warnStroke},${pulse + 0.3})`;
       ctx.lineWidth = 2.5;
       ctx.setLineDash([9, 7]);
       ctx.lineDashOffset = -frame * 1.6;
@@ -1245,7 +1306,7 @@ function drawLaser() {
     } else {
       // ACTIVE — layered glow: soft outer bloom, gradient body, hot white core, sparkles
       ctx.save();
-      ctx.shadowColor = '#3dffa0';
+      ctx.shadowColor = stunColors.glow;
       ctx.shadowBlur = 28;
 
       let grad;
@@ -1254,11 +1315,11 @@ function drawLaser() {
       } else {
         grad = ctx.createLinearGradient(0, l.y - l.height / 2, 0, l.y + l.height / 2);
       }
-      grad.addColorStop(0, 'rgba(20,140,70,0)');
-      grad.addColorStop(0.18, 'rgba(50,230,110,0.85)');
-      grad.addColorStop(0.5, 'rgba(230,255,235,1)');
-      grad.addColorStop(0.82, 'rgba(50,230,110,0.85)');
-      grad.addColorStop(1, 'rgba(20,140,70,0)');
+      grad.addColorStop(0, stunColors.g0);
+      grad.addColorStop(0.18, stunColors.g1);
+      grad.addColorStop(0.5, stunColors.g2);
+      grad.addColorStop(0.82, stunColors.g1);
+      grad.addColorStop(1, stunColors.g0);
       ctx.fillStyle = grad;
       if (orient === 'v') {
         ctx.fillRect(l.x - l.width / 2 - 5, 0, l.width + 10, H);
@@ -1363,7 +1424,7 @@ function initTurrets() {
 }
 
 function updateTurrets() {
-  if (phase < 2 || phase >= 4) return;
+  if (!bossRespawned || phase < 2 || phase >= 4) return;
   for (const t of turrets) {
     if (t.flashTimer > 0) {
       t.flashTimer--;
@@ -1402,18 +1463,19 @@ function updateTurrets() {
 function fireMissileFromTurret(t) {
   let x, y, vx, vy;
   if (t.side === 'top') {
-    x = t.beamPos; y = -14; vx = 0; vy = 1.4;
+    x = t.beamPos; y = -14; vx = 0; vy = 1.7;
   } else if (t.side === 'left') {
-    x = -14; y = t.beamPos; vx = 1.4; vy = 0;
+    x = -14; y = t.beamPos; vx = 1.7; vy = 0;
   } else {
-    x = W + 14; y = t.beamPos; vx = -1.4; vy = 0;
+    x = W + 14; y = t.beamPos; vx = -1.7; vy = 0;
   }
   broccoliList.push({
     x, y, vx, vy, r: 9,
     homing: true,
     missile: true,
     rot: Math.atan2(vy, vx),
-    rotSpeed: 0
+    rotSpeed: 0,
+    trail: []
   });
   applyBeamSelfDamage();
   dialogue.textContent = "* A turret launches a heat-seeking missile!";
@@ -1737,10 +1799,14 @@ function update() {
   const friction = 0.82;
   const maxSpeed = (player.blocking ? 1.6 : 3.4) * rootFactor * speedCompensation;
   let ix = 0, iy = 0;
-  if (keys['arrowleft'] || keys['a'] || keys['KeyA']) ix -= 1;
-  if (keys['arrowright'] || keys['d'] || keys['KeyD']) ix += 1;
-  if (keys['arrowup'] || keys['w'] || keys['KeyW']) iy -= 1;
-  if (keys['arrowdown'] || keys['s'] || keys['KeyS']) iy += 1;
+  if (player.stunTimer > 0) {
+    player.stunTimer--;
+  } else {
+    if (keys['arrowleft'] || keys['a'] || keys['KeyA']) ix -= 1;
+    if (keys['arrowright'] || keys['d'] || keys['KeyD']) ix += 1;
+    if (keys['arrowup'] || keys['w'] || keys['KeyW']) iy -= 1;
+    if (keys['arrowdown'] || keys['s'] || keys['KeyS']) iy += 1;
+  }
   if (ix !== 0 && iy !== 0) { ix *= 0.7071; iy *= 0.7071; } // normalize diagonals
   if (ix !== 0 || iy !== 0) {
     player.facingX = ix;
@@ -1998,6 +2064,7 @@ function update() {
     updateLastStandBeams();
   } else {
     updateLaser();
+    updateBossStunBeam();
   }
   processLasers();
 
@@ -2046,11 +2113,12 @@ function update() {
     if (b.homing) {
       const dx = player.x - b.x, dy = player.y - b.y;
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-      b.vx += (dx / dist) * 0.03;
-      b.vy += (dy / dist) * 0.03;
-      // cap homing speed so it stays dodgeable
+      const turnForce = b.missile ? 0.05 : 0.03;
+      b.vx += (dx / dist) * turnForce;
+      b.vy += (dy / dist) * turnForce;
+      // cap homing speed so it stays dodgeable (missiles run a bit hotter)
       const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-      const maxSpd = 2.4 + phase * 0.35;
+      const maxSpd = (b.missile ? 3.0 : 2.4) + phase * 0.35;
       if (spd > maxSpd) {
         b.vx = (b.vx / spd) * maxSpd;
         b.vy = (b.vy / spd) * maxSpd;
@@ -2059,6 +2127,11 @@ function update() {
     b.x += b.vx * moveScale;
     b.y += b.vy * moveScale;
     b.rot = (b.rot || 0) + (b.rotSpeed || 0) * moveScale;
+    if (b.missile) {
+      b.trail = b.trail || [];
+      b.trail.push({ x: b.x, y: b.y, life: 1 });
+      b.trail = b.trail.map(p => ({ ...p, life: p.life - 0.09 })).filter(p => p.life > 0);
+    }
   }
   broccoliList = broccoliList.filter(b => b.x > -40 && b.x < W + 40 && b.y > -40 && b.y < H + 40);
 
@@ -2099,7 +2172,7 @@ function update() {
           shakeMag = 4;
           dialogue.textContent = "* PARRY! You knock it right back!";
         } else {
-          let dmg = b.wave ? 14 : (b.kernel ? 4 : (b.missile ? 13 : 10));
+          let dmg = b.wave ? 14 : (b.kernel ? 4 : (b.missile ? 17 : 10));
           if (player.blocking) dmg *= 0.35;
           playerHp -= dmg;
           b.hit = true;
@@ -2123,11 +2196,14 @@ function update() {
       phase = 2;
       bossEmoji.style.filter = 'none';
       bossEmoji.style.transform = bossRestTransform();
+      bossEmoji.classList.add('respawnFlash');
+      setTimeout(() => bossEmoji.classList.remove('respawnFlash'), 900);
       shakeTime = 26;
       shakeMag = 8;
       dialogue.textContent = "* CHECKPOINT! The broccoli regenerates and rises again!";
       statusEl.textContent = '⚡ CHECKPOINT — the broccoli refuses to stay down!';
       setTimeout(() => { if (!gameOver) statusEl.textContent = ''; }, 2200);
+      turretLayer.style.display = ''; // turrets reveal themselves for round two
 
       // clean slate for round two
       spiralActive = false;
@@ -2232,21 +2308,48 @@ function draw() {
   drawPuddles();
 
   // broccoli — each tumbles gently as it flies (kernels render smaller,
-  // missiles get a rocket sprite plus a little exhaust trail)
+  // missiles get a glowing flame trail plus a hot rocket sprite)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let b of broccoliList) {
     if (b.missile) {
+      // particle exhaust trail, fading and shrinking behind it
+      if (b.trail) {
+        for (const p of b.trail) {
+          ctx.save();
+          ctx.globalAlpha = p.life * 0.8;
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 6 * p.life + 1);
+          grad.addColorStop(0, 'rgba(255,240,180,0.9)');
+          grad.addColorStop(0.4, 'rgba(255,140,40,0.7)');
+          grad.addColorStop(1, 'rgba(255,60,20,0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 6 * p.life + 1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+      // bright core glow under the rocket itself
       ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.font = '14px serif';
-      ctx.fillText('🚀', b.x - b.vx * 2.2, b.y - b.vy * 2.2);
+      ctx.shadowColor = '#ffb347';
+      ctx.shadowBlur = 14;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,200,100,0.5)';
+      ctx.fill();
       ctx.restore();
     }
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.missile ? Math.atan2(b.vy, b.vx) + Math.PI / 2 : (b.rot || 0));
-    ctx.font = b.kernel ? '15px serif' : (b.missile ? '18px serif' : '26px serif');
+    if (b.missile) {
+      ctx.shadowColor = '#ff8c3c';
+      ctx.shadowBlur = 10;
+      ctx.font = '20px serif';
+    } else {
+      ctx.font = b.kernel ? '15px serif' : '26px serif';
+    }
     ctx.fillText(b.kernel ? '🌽' : (b.missile ? '🚀' : '🥦'), 0, 0);
     ctx.restore();
   }
@@ -2354,6 +2457,52 @@ function draw() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('🫗', player.r + 6, player.r + 4);
+    ctx.restore();
+  }
+
+  // stunned by the boss's beam — dizzy stars circling overhead
+  if (player.stunTimer > 0) {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.font = '12px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < 3; i++) {
+      const ang = frame * 0.25 + (i * Math.PI * 2) / 3;
+      ctx.fillText('💫', Math.cos(ang) * 14, -player.r - 8 + Math.sin(ang) * 5);
+    }
+    ctx.restore();
+  }
+
+  // missile lock-on — a pulsing targeting reticle while any heat-seeker is in flight
+  if (broccoliList.some(b => b.missile)) {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(frame * 0.05);
+    const pulse = 0.6 + 0.4 * Math.abs(Math.sin(frame * 0.25));
+    const rSize = player.r + 12 + Math.sin(frame * 0.2) * 2;
+    ctx.strokeStyle = `rgba(255,60,50,${pulse})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, rSize, 0, Math.PI * 2);
+    ctx.stroke();
+    // corner tick marks, like a lock-on reticle
+    for (let i = 0; i < 4; i++) {
+      const ang = (Math.PI / 2) * i + Math.PI / 4;
+      const x1 = Math.cos(ang) * (rSize - 5), y1 = Math.sin(ang) * (rSize - 5);
+      const x2 = Math.cos(ang) * (rSize + 5), y2 = Math.sin(ang) * (rSize + 5);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.font = '10px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = pulse;
+    ctx.fillText('🎯', player.x, player.y - player.r - 22);
     ctx.restore();
   }
 
