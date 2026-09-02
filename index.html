@@ -1444,13 +1444,18 @@ function updateBossStunBeam() {
 
 function updateLaser() {
   // normal phase-3+ steam beam — off during the last stand (phase 4
-  // is fully passive now, see updateLastStandBeams)
+  // is fully passive now, see updateLastStandBeams). Fires twice as
+  // often during the final round (second respawn), before HP has
+  // dropped low enough to trigger the last-stand beam walls.
   if (phase < 3 || phase === 4) return;
   laserTimer++;
-  const interval = Math.max(40, (150 - phase * 18) / 1.5); // 1.5x spawn speed
+  let interval = Math.max(40, (150 - phase * 18) / 1.5); // 1.5x spawn speed
+  if (beatClockActive) interval /= 2; // 2x more often in the final round
   if (laserTimer > interval) {
     laserTimer = 0;
     const roll = Math.random();
+
+    const moveMult = beatClockActive ? 2 : 1; // beams drift 2x faster in the final round
 
     if (roll < 0.4) {
       // classic: a single beam that drifts during its warning, then locks in and fires
@@ -1461,7 +1466,7 @@ function updateLaser() {
         stage: 'telegraph',
         timer: 0,
         hit: false,
-        moveSpeed: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 1.2)
+        moveSpeed: (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random() * 1.2) * moveMult
       });
       dialogue.textContent = "* A STEAM BEAM sweeps in, hunting for you!";
       applyBeamSelfDamage();
@@ -1475,7 +1480,7 @@ function updateLaser() {
         stage: 'telegraph',
         timer: 0,
         hit: false,
-        moveSpeed: (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.0)
+        moveSpeed: (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 1.0) * moveMult
       });
       dialogue.textContent = "* A beam sweeps in sideways, drifting as it charges!";
       applyBeamSelfDamage();
@@ -1484,7 +1489,7 @@ function updateLaser() {
       // twin beams with a narrow gap between them, drifting together
       const gapCenter = 60 + Math.random() * (W - 120);
       const gapWidth = 46;
-      const twinSpeed = (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 0.9);
+      const twinSpeed = (Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 0.9) * moveMult;
       laserList.push({
         orientation: 'v', x: gapCenter - gapWidth / 2 - 17, width: 34,
         stage: 'telegraph', timer: 0, hit: false, moveSpeed: twinSpeed
