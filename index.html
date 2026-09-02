@@ -478,7 +478,7 @@
 
 <div id="status"></div>
 <button id="restartBtn">FIGHT AGAIN</button>
-<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good, PLUS the turrets outside the box reveal themselves and start firing lock-on beams and heat-seeking missiles, and the boss itself now fires its own golden stunning beam that snaps to your exact position and can't be outrun — it hits lighter but locks up your controls for a moment. Dashing through it (Q) or blocking (E) are the only ways to avoid the stun. This can happen TWICE. The first time is a normal comeback at 50% HP, fighting through turrets and beams. The second (and final) time, the turrets and beams stand down for good, PARRYING NO LONGER WORKS, and a beat kicks in (synced kick/hat drum, a pulse on every downbeat): the broccoli SLAMS down from above the box in a dramatic entrance (screen shake + impact flash), the portrait over the boss bar fading out the instant it lands. From there it can't hurt you at all — no ring bursts, no aimed spreads, no dives, not even a touch — it just wanders around harmlessly while taking 0.2% of its max HP in self-damage every time it would have attacked, with downbeats speeding that up further. Just dodge it and watch it wear itself down for the real win. If YOU die at any point, you don't start over from scratch — dying resumes the fight from the last checkpoint you actually reached (the button will say RETRY FROM CHECKPOINT), so a death in the final round only sends you back to the start of that round, not all the way to round one.</div>
+<div id="instructions">Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good, PLUS the turrets outside the box reveal themselves and start firing lock-on beams and heat-seeking missiles, and the boss itself now fires its own golden stunning beam that snaps to your exact position and can't be outrun — it hits lighter but locks up your controls for a moment. Dashing through it (Q) or blocking (E) are the only ways to avoid the stun. This can happen TWICE. The first time is a normal comeback at 50% HP, fighting through turrets and beams. The second (and final) time, the turrets and beams stand down for good, PARRYING NO LONGER WORKS, and a beat kicks in (synced kick/hat drum, a pulse on every downbeat): the broccoli SLAMS down from above the box in a dramatic entrance (screen shake + impact flash), the portrait over the boss bar fading out the instant it lands. From there it can't dive or touch you, but it does periodically shed a few real florets straight off its own body that shoot outward and can home in — dodge those — while otherwise just wandering harmlessly and taking 0.2% of its max HP in self-damage every time its old ring/aimed/cross/homing patterns would have fired, with downbeats speeding that self-damage up further. Beat that down for the real win. If YOU die at any point, you don't start over from scratch — dying resumes the fight from the last checkpoint you actually reached (the button will say RETRY FROM CHECKPOINT), so a death in the final round only sends you back to the start of that round, not all the way to round one.</div>
 
 <div id="adminToggle">⚙ admin</div>
 <div id="adminLock">
@@ -638,7 +638,7 @@ const bossField = {
   x: W / 2, y: -30, targetX: W / 2, targetY: 100, wanderTimer: 0,
   descended: false, arrived: false, hitCooldown: 0,
   diveState: 'idle', diveTimer: 0, diveCooldown: 260, diveTargetX: W / 2,
-  attackTimer: 70, patternIndex: 0
+  attackTimer: 70, patternIndex: 0, broccoliTimer: 100
 };
 const FIELD_PATTERN_SEQUENCE = ['ring', 'aim', 'cross', 'homing', 'aim', 'ring'];
 const BOSS_FIELD_MARGIN = 46;
@@ -775,8 +775,31 @@ function updateBossFieldSprite() {
     }
   }
 
+  // BROCCOLI SHED — a real attack: while it wanders, the field boss
+  // periodically sheds a few florets that shoot outward from its own
+  // body, reusing the normal broccoli projectile system
+  if (bossField.diveState === 'idle') {
+    bossField.broccoliTimer--;
+    if (bossField.broccoliTimer <= 0) {
+      const count = 2 + Math.floor(Math.random() * 2); // 2-3 florets
+      const baseAngle = Math.random() * Math.PI * 2;
+      for (let i = 0; i < count; i++) {
+        const a = baseAngle + (i / count) * Math.PI * 2;
+        const speed = 1.8 + Math.random() * 0.8;
+        broccoliList.push({
+          x: bossField.x, y: bossField.y,
+          vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
+          r: 10, homing: Math.random() < 0.3,
+          rot: a, rotSpeed: (Math.random() - 0.5) * 0.2
+        });
+      }
+      dialogue.textContent = "* The broccoli sheds florets right off its own body!";
+      bossField.broccoliTimer = 85 + Math.random() * 45;
+    }
+  }
+
   // contact damage is disabled too — during this round the boss can't
-  // hurt you at all, it only damages itself on its old attack schedule
+  // deal damage by touch, only through the florets it sheds
 }
 
 // jelly squash/stretch spring — a little life in the player sprite,
@@ -1015,6 +1038,7 @@ function initGame() {
   bossField.diveCooldown = 260;
   bossField.attackTimer = 70;
   bossField.patternIndex = 0;
+  bossField.broccoliTimer = 100;
   bossFieldSprite.classList.remove('diveWarning', 'diving');
   bossFieldSprite.style.display = 'none';
   bossEmoji.classList.remove('portraitGone');
