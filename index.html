@@ -807,6 +807,16 @@
     <button class="actionBtn admBtn" id="admPuddle">Puddle</button>
   </div>
   <div class="adminRow">
+    <span class="adminLabel">Force mode</span>
+    <button class="actionBtn admBtn" id="admModeSlide">Slide</button>
+    <button class="actionBtn admBtn" id="admModeBlackout">Blackout</button>
+    <button class="actionBtn admBtn" id="admModeVortex">Vortex</button>
+    <button class="actionBtn admBtn" id="admModeMirror">Mirror</button>
+    <button class="actionBtn admBtn" id="admModeCrush">Crush</button>
+    <button class="actionBtn admBtn" id="admModeSlick">Slick</button>
+    <button class="actionBtn admBtn" id="admModeEnd">End mode</button>
+  </div>
+  <div class="adminRow">
     <span class="adminLabel">Speed</span>
     <input type="range" id="admSpeed" min="0.1" max="2" step="0.1" value="0.5">
     <span id="admSpeedVal">0.5x</span>
@@ -1294,7 +1304,7 @@ function endBlackoutMode() {
 }
 function updateBlackoutMode() {
   if (!blackoutMode) {
-    if (phase >= 2 && phase < 4 && !beatClockActive && !slideMode && !vortexMode) {
+    if (phase >= 2 && phase < 4 && !beatClockActive && !anyOtherModeActive('blackout')) {
       blackoutCooldown--;
       if (blackoutCooldown <= 0) startBlackoutMode();
     }
@@ -1353,7 +1363,7 @@ function endVortexMode() {
 }
 function updateVortexMode() {
   if (!vortexMode) {
-    if (phase >= 3 && phase < 4 && !beatClockActive && !slideMode && !blackoutMode) {
+    if (phase >= 3 && phase < 4 && !beatClockActive && !anyOtherModeActive('vortex')) {
       vortexCooldown--;
       if (vortexCooldown <= 0) startVortexMode();
     }
@@ -1404,11 +1414,183 @@ function drawVortex() {
   ctx.restore();
 }
 
+// ===== MIRROR MODE =====
+// The boss scrambles your left/right inputs. Nothing else changes, so it
+// is purely a "trust your instincts less" test rather than a damage check.
+let mirrorMode = false;
+let mirrorTimer = 0;
+let mirrorCooldown = 1800;
+const MIRROR_DURATION = 330;
+
+function startMirrorMode() {
+  mirrorMode = true;
+  mirrorTimer = MIRROR_DURATION;
+  fireAttackWarning('\u26a0 CONTROLS MIRRORED \u26a0');
+  dialogue.textContent = "* Your sense of direction flips \u2014 left is right!";
+}
+function endMirrorMode() {
+  mirrorMode = false;
+  mirrorCooldown = 1700 + Math.random() * 800;
+  dialogue.textContent = "* Your bearings snap back to normal.";
+}
+function updateMirrorMode() {
+  if (!mirrorMode) {
+    if (phase >= 2 && phase < 4 && !beatClockActive && !anyOtherModeActive('mirror')) {
+      mirrorCooldown--;
+      if (mirrorCooldown <= 0) startMirrorMode();
+    }
+    return;
+  }
+  mirrorTimer--;
+  if (mirrorTimer <= 0) endMirrorMode();
+}
+function drawMirrorOverlay() {
+  if (!mirrorMode) return;
+  const fade = Math.min(1, Math.min(MIRROR_DURATION - mirrorTimer, mirrorTimer) / 35);
+  ctx.save();
+  ctx.globalAlpha = 0.28 * fade;
+  ctx.fillStyle = '#7b3dff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 0.85 * fade;
+  ctx.strokeStyle = '#c9a6ff';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([14, 10]);
+  ctx.lineDashOffset = -frame * 2;
+  ctx.strokeRect(3, 3, W - 6, H - 6);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = fade;
+  ctx.fillStyle = '#e6d6ff';
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('\u21c4 MIRRORED \u21c4', W / 2, 20);
+  ctx.restore();
+}
+
+// ===== CRUSH MODE =====
+// Solid walls grind inward from every edge, squeezing the arena down to a
+// small box. You keep full control, but your room to dodge shrinks fast.
+let crushMode = false;
+let crushTimer = 0;
+let crushCooldown = 2400;
+let crushInset = 0;
+const CRUSH_DURATION = 420;
+const CRUSH_MAX_INSET = 74;
+
+function startCrushMode() {
+  crushMode = true;
+  crushTimer = CRUSH_DURATION;
+  crushInset = 0;
+  fireAttackWarning('\u26a0 WALLS CLOSING IN \u26a0');
+  dialogue.textContent = "* The walls grind inward \u2014 the arena is shrinking!";
+}
+function endCrushMode() {
+  crushMode = false;
+  crushInset = 0;
+  crushCooldown = 2200 + Math.random() * 1000;
+  dialogue.textContent = "* The walls grind back open.";
+}
+function updateCrushMode() {
+  if (!crushMode) {
+    if (phase >= 3 && phase < 4 && !beatClockActive && !anyOtherModeActive('crush')) {
+      crushCooldown--;
+      if (crushCooldown <= 0) startCrushMode();
+    }
+    return;
+  }
+  crushTimer--;
+  if (crushTimer <= 0) { endCrushMode(); return; }
+  // ease in, hold, then ease back out so it never traps you at the end
+  const t = 1 - (crushTimer / CRUSH_DURATION);
+  const shape = t < 0.25 ? (t / 0.25)
+              : t > 0.8  ? Math.max(0, (1 - t) / 0.2)
+              : 1;
+  crushInset = CRUSH_MAX_INSET * shape;
+}
+function crushBounds() {
+  return crushMode ? crushInset : 0;
+}
+function drawCrushWalls() {
+  if (!crushMode || crushInset <= 0.5) return;
+  const i = crushInset;
+  ctx.save();
+  ctx.fillStyle = 'rgba(120,25,25,0.92)';
+  ctx.fillRect(0, 0, W, i);
+  ctx.fillRect(0, H - i, W, i);
+  ctx.fillRect(0, 0, i, H);
+  ctx.fillRect(W - i, 0, i, H);
+  ctx.strokeStyle = '#ff6b6b';
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = '#ff4040';
+  ctx.shadowBlur = 12;
+  ctx.strokeRect(i, i, W - i * 2, H - i * 2);
+  ctx.restore();
+}
+
+// ===== SLICK MODE =====
+// The floor turns to grease: acceleration and braking both go soft, so you
+// drift well past where you meant to stop.
+let slickMode = false;
+let slickTimer = 0;
+let slickCooldown = 2000;
+const SLICK_DURATION = 400;
+
+function startSlickMode() {
+  slickMode = true;
+  slickTimer = SLICK_DURATION;
+  fireAttackWarning('\u26a0 SLICK FLOOR \u26a0');
+  dialogue.textContent = "* Ranch slicks the floor \u2014 you can't stop on a dime!";
+}
+function endSlickMode() {
+  slickMode = false;
+  slickCooldown = 1900 + Math.random() * 900;
+  dialogue.textContent = "* The floor grips again.";
+}
+function updateSlickMode() {
+  if (!slickMode) {
+    if (phase >= 2 && phase < 4 && !beatClockActive && !anyOtherModeActive('slick')) {
+      slickCooldown--;
+      if (slickCooldown <= 0) startSlickMode();
+    }
+    return;
+  }
+  slickTimer--;
+  if (slickTimer <= 0) endSlickMode();
+}
+function drawSlickOverlay() {
+  if (!slickMode) return;
+  const fade = Math.min(1, Math.min(SLICK_DURATION - slickTimer, slickTimer) / 35);
+  ctx.save();
+  ctx.globalAlpha = 0.16 * fade;
+  ctx.fillStyle = '#bfe9ff';
+  ctx.fillRect(0, 0, W, H);
+  // drifting sheen streaks to sell the slipperiness
+  ctx.globalAlpha = 0.22 * fade;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    const y = ((frame * 0.8 + i * 70) % (H + 40)) - 20;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y + 14);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// only one special mode runs at a time — each mode asks this before starting
+function anyOtherModeActive(self) {
+  const active = {
+    slide: slideMode, blackout: blackoutMode, vortex: vortexMode,
+    mirror: mirrorMode, crush: crushMode, slick: slickMode
+  };
+  return Object.keys(active).some(k => k !== self && active[k]);
+}
+
 function updateSlideMode() {
   // only shows up once the fight has escalated, and never during the
   // passive last stand or the final beat-synced round
   if (!slideMode) {
-    if (phase >= 2 && phase < 4 && !beatClockActive) {
+    if (phase >= 2 && phase < 4 && !beatClockActive && !anyOtherModeActive('slide')) {
       slideModeCooldown--;
       if (slideModeCooldown <= 0) startSlideMode();
     }
@@ -1659,6 +1841,16 @@ function initGame() {
   blackoutMode = false;
   blackoutTimer = 0;
   blackoutCooldown = 1500;
+  mirrorMode = false;
+  mirrorTimer = 0;
+  mirrorCooldown = 1800;
+  crushMode = false;
+  crushTimer = 0;
+  crushInset = 0;
+  crushCooldown = 2400;
+  slickMode = false;
+  slickTimer = 0;
+  slickCooldown = 2000;
   vortexMode = false;
   vortexTimer = 0;
   vortexCooldown = 2100;
@@ -1686,14 +1878,20 @@ function initGame() {
   lastBeatIndexRound1 = -1;
   // MEGALOVANIA plays for round 1 only; "Skeletal Shenanigans" for round 2
   // only — start/resume whichever one matches where this run begins
+  // cancel any in-flight fades and reset both tracks, then fade the
+  // correct one up from silence so a run never starts on a hard cut
+  for (const [, token] of activeFades) token.cancelled = true;
+  activeFades.clear();
   startTrack.pause();
   startTrack.currentTime = 0;
+  startTrack.volume = 0;
   respawn1Track.pause();
   respawn1Track.currentTime = 0;
+  respawn1Track.volume = 0;
   if (savedCheckpointCount === 0) {
-    startTrack.play().catch(() => {});
+    fadeTrack(startTrack, TRACK_VOLUME, 1200, { startAt: 0 });
   } else if (savedCheckpointCount === 1 || savedCheckpointCount === MAX_BOSS_RESPAWNS) {
-    respawn1Track.play().catch(() => {});
+    fadeTrack(respawn1Track, TRACK_VOLUME, 1200, { startAt: 0 });
   }
   bossField.x = W / 2;
   bossField.y = -30;
@@ -2635,6 +2833,62 @@ respawn1Track.volume = 0.5;
 // actual audio isn't embedded in this file.
 const startTrack = document.getElementById('startTrack');
 startTrack.volume = 0.5;
+
+// ===== MUSIC CROSSFADING =====
+// Tracks blend into each other instead of hard-cutting. Each fade runs on
+// its own rAF loop and cancels any fade already running on that element,
+// so rapid transitions (e.g. dying mid-fade and restarting) can't leave
+// two fades fighting over the same volume.
+const TRACK_VOLUME = 0.5;
+const CROSSFADE_MS = 1800;
+const activeFades = new Map(); // audio element -> cancel flag
+
+function fadeTrack(el, targetVol, ms, { pauseAtEnd = false, startAt = null } = {}) {
+  if (!el) return;
+  // cancel any in-flight fade on this element
+  const prev = activeFades.get(el);
+  if (prev) prev.cancelled = true;
+  const token = { cancelled: false };
+  activeFades.set(el, token);
+
+  const fromVol = el.volume;
+  const t0 = performance.now();
+
+  // fading IN from silence: make sure it's actually rolling
+  if (targetVol > 0 && el.paused) {
+    if (startAt !== null) el.currentTime = startAt;
+    el.volume = 0;
+    el.play().catch(() => {});
+  }
+
+  function step(now) {
+    if (token.cancelled) return;
+    const t = Math.min(1, (now - t0) / ms);
+    // equal-power-ish curve so the blend doesn't dip in the middle
+    const eased = t * t * (3 - 2 * t);
+    el.volume = Math.max(0, Math.min(1, fromVol + (targetVol - fromVol) * eased));
+    if (t < 1) {
+      requestAnimationFrame(step);
+    } else {
+      el.volume = targetVol;
+      if (pauseAtEnd && targetVol === 0) el.pause();
+      activeFades.delete(el);
+    }
+  }
+  requestAnimationFrame(step);
+}
+
+// blend one track out while the other comes up underneath it
+function crossfadeTracks(fromEl, toEl, { restart = false } = {}) {
+  if (fromEl) fadeTrack(fromEl, 0, CROSSFADE_MS, { pauseAtEnd: true });
+  if (toEl) fadeTrack(toEl, TRACK_VOLUME, CROSSFADE_MS, { startAt: restart ? 0 : null });
+}
+
+// gentle fade-out used when the fight ends, so it doesn't cut dead
+function fadeOutAllTracks(ms = 900) {
+  fadeTrack(startTrack, 0, ms, { pauseAtEnd: true });
+  fadeTrack(respawn1Track, 0, ms, { pauseAtEnd: true });
+}
 const bossFieldSprite = document.getElementById('bossFieldSprite');
 const dangerVignette = document.getElementById('dangerVignette');
 const phaseFlash = document.getElementById('phaseFlash');
@@ -3329,8 +3583,10 @@ function update() {
   // HP (phase 4), compensate so movement stays at full 1x real-world
   // speed even though beams/timers keep running at the slower pace.
   const speedCompensation = lastStandSpeedCompensation();
-  const accel = (player.blocking ? 0.45 : 0.9) * rootFactor * speedCompensation;
-  const friction = 0.82;
+  const accel = (player.blocking ? 0.45 : 0.9) * rootFactor * speedCompensation
+    * (slickMode ? 0.45 : 1);
+  // slick floor: much less braking, so you keep drifting after releasing
+  const friction = slickMode ? 0.965 : 0.82;
   const maxSpeed = (player.blocking ? 1.6 : 3.4) * rootFactor * speedCompensation;
   let ix = 0, iy = 0;
   if (player.stunTimer > 0) {
@@ -3340,6 +3596,7 @@ function update() {
     // A/D keep working as normal left/right movement
     if (keys['arrowleft'] || keys['a'] || keys['KeyA']) ix -= 1;
     if (keys['arrowright'] || keys['d'] || keys['KeyD']) ix += 1;
+    if (mirrorMode) ix = -ix; // scrambled bearings
     if (!slideMode) {
       if (keys['arrowup'] || keys['w'] || keys['KeyW']) iy -= 1;
       if (keys['arrowdown'] || keys['s'] || keys['KeyS']) iy += 1;
@@ -3367,6 +3624,9 @@ function update() {
   updateSlideMode();
   updateBlackoutMode();
   updateVortexMode();
+  updateMirrorMode();
+  updateCrushMode();
+  updateSlickMode();
 
   // gentle lean in the direction of travel + a light squash for bounce
   player.tilt += ((-player.vx * 2.5) - player.tilt) * 0.15;
@@ -3388,10 +3648,13 @@ function update() {
   player.trail.length = writeIdx;
   if (player.trail.length > 14) player.trail.splice(0, player.trail.length - 14);
 
-  const bounced = player.x <= player.r || player.x >= W - player.r ||
-                  player.y <= player.r || player.y >= H - player.r;
-  player.x = Math.max(player.r, Math.min(W - player.r, player.x));
-  player.y = Math.max(player.r, Math.min(H - player.r, player.y));
+  const inset = crushBounds();
+  const minX = player.r + inset, maxX = W - player.r - inset;
+  const minY = player.r + inset, maxY = H - player.r - inset;
+  const bounced = player.x <= minX || player.x >= maxX ||
+                  player.y <= minY || player.y >= maxY;
+  player.x = Math.max(minX, Math.min(maxX, player.x));
+  player.y = Math.max(minY, Math.min(maxY, player.y));
   if (bounced) { player.vx *= 0.3; player.vy *= 0.3; }
 
   // dash / teleport (Q) — instant hop in your facing direction
@@ -3844,9 +4107,8 @@ function update() {
 
       // MEGALOVANIA (round 1) hands off to "Skeletal Shenanigans" (round 2)
       if (bossRespawnCount === 1) {
-        startTrack.pause();
-        respawn1Track.currentTime = 0;
-        respawn1Track.play().catch(() => {});
+        // blend MEGALOVANIA out as "Skeletal Shenanigans" rises underneath
+        crossfadeTracks(startTrack, respawn1Track, { restart: true });
       }
 
       // the second (final) respawn kicks on the beat-synced overlay and
@@ -3854,8 +4116,7 @@ function update() {
       // "Skeletal Shenanigans" keeps playing through this round too now.
       if (bossRespawnCount === MAX_BOSS_RESPAWNS) {
         if (respawn1Track.paused) {
-          respawn1Track.currentTime = 0;
-          respawn1Track.play().catch(() => {});
+          fadeTrack(respawn1Track, TRACK_VOLUME, CROSSFADE_MS, { startAt: 0 });
         }
         beatClockActive = true;
         lastBeatIndex = -1;
@@ -4054,6 +4315,9 @@ function draw() {
   drawBossDiveTelegraph();
   drawRailScorch();
   drawVortex();
+  drawSlickOverlay();
+  drawCrushWalls();
+  drawMirrorOverlay();
   drawBossLandingFlash();
   drawLaser();
 
@@ -4197,8 +4461,7 @@ function draw() {
 function endGame(won) {
   gameOver = true;
   restartBtn.style.display = 'inline-block';
-  startTrack.pause();
-  respawn1Track.pause();
+  fadeOutAllTracks();
   if (won) {
     statusEl.textContent = '🎉 YOU WON! The broccoli has been thoroughly grilled.';
     dialogue.textContent = '* The broccoli wilts in defeat.';
@@ -4393,6 +4656,29 @@ document.getElementById('admFillCombo').addEventListener('click', () => {
   updateComboBar();
 });
 
+// --- force mode (admin) ---
+// ends whatever mode is running first, so forcing one can never leave two
+// active at once and bypass the normal exclusivity guard
+function endAllSpecialModes() {
+  if (slideMode) endSlideMode();
+  if (blackoutMode) endBlackoutMode();
+  if (vortexMode) endVortexMode();
+  if (mirrorMode) endMirrorMode();
+  if (crushMode) endCrushMode();
+  if (slickMode) endSlickMode();
+}
+function forceMode(starter) {
+  endAllSpecialModes();
+  if (starter) starter();
+}
+document.getElementById('admModeSlide').addEventListener('click', () => forceMode(startSlideMode));
+document.getElementById('admModeBlackout').addEventListener('click', () => forceMode(startBlackoutMode));
+document.getElementById('admModeVortex').addEventListener('click', () => forceMode(startVortexMode));
+document.getElementById('admModeMirror').addEventListener('click', () => forceMode(startMirrorMode));
+document.getElementById('admModeCrush').addEventListener('click', () => forceMode(startCrushMode));
+document.getElementById('admModeSlick').addEventListener('click', () => forceMode(startSlickMode));
+document.getElementById('admModeEnd').addEventListener('click', () => forceMode(null));
+
 document.getElementById('admWave').addEventListener('click', () => spawnWave());
 document.getElementById('admSpiral').addEventListener('click', () => {
   spiralActive = true;
@@ -4446,10 +4732,12 @@ initGame();
 function tryStartCurrentTrack() {
   if (gameOver) return;
   ensureAudio();
+  // fade in rather than snapping on, and guarantee we land at full volume
+  // even if an earlier fade was interrupted by a blocked autoplay attempt
   if (bossRespawnCount === 0 && startTrack.paused) {
-    startTrack.play().catch(() => {});
+    fadeTrack(startTrack, TRACK_VOLUME, 900);
   } else if ((bossRespawnCount === 1 || bossRespawnCount === MAX_BOSS_RESPAWNS) && respawn1Track.paused) {
-    respawn1Track.play().catch(() => {});
+    fadeTrack(respawn1Track, TRACK_VOLUME, 900);
   }
 }
 ['pointerdown', 'keydown', 'click', 'touchend'].forEach(evt => {
