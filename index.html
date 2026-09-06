@@ -879,6 +879,44 @@ function ticksUntilBeatsAhead(beatsAhead) {
 }
 let lastBeatIndexRound2 = -1;
 
+// ROUND 1 BEAT LOCK — same idea as the round-2 lock above, but keyed to
+// the opening track. Tempo measured from the uploaded file's own onset
+// pattern via autocorrelation (clustered ~117-123 BPM, with a strong
+// double near 235), which matches the track's well-known 120 BPM.
+const ROUND1_TRACK_BPM = 120;
+const ROUND1_BEAT_PERIOD_SEC = 60 / ROUND1_TRACK_BPM;
+let lastBeatIndexRound1 = -1;
+function round1TicksUntilBeatsAhead(beatsAhead) {
+  const t = startTrack.currentTime || 0;
+  const currentBeatIndex = Math.floor(t / ROUND1_BEAT_PERIOD_SEC);
+  const targetTimeSec = (currentBeatIndex + beatsAhead) * ROUND1_BEAT_PERIOD_SEC;
+  const secondsUntil = Math.max(0.05, targetTimeSec - t);
+  return Math.round(secondsUntil * 60 * GLOBAL_TIME_SCALE);
+}
+// round 1 is only beat-locked while its track is actually playing
+function round1BeatActive() {
+  return bossRespawnCount === 0 && startTrack && !startTrack.paused && startTrack.currentTime > 0;
+}
+// pulses the canvas + flashes the boss on the downbeat during round 1
+function updateRound1BeatPulse() {
+  if (!round1BeatActive()) return;
+  const beatIndex = Math.floor((startTrack.currentTime || 0) / ROUND1_BEAT_PERIOD_SEC);
+  if (beatIndex === lastBeatIndexRound1) return;
+  lastBeatIndexRound1 = beatIndex;
+  if (beatIndex % 4 === 0) {
+    beatKick();
+    pulseCanvasOnBeat();
+    kickJelly(10);
+    bossEmoji.style.transform = bossRestTransform() + ' scale(1.06)';
+    setTimeout(() => {
+      if (!gameOver) bossEmoji.style.transform = bossRestTransform();
+    }, 100);
+  } else {
+    beatHat();
+    kickJelly(3);
+  }
+}
+
 // --- FINAL ROUND (second respawn only) — a beat-synced overlay ported from
 // a companion prototype. A simple synth kick/hat plays on a fixed clock,
 // the canvas pulses on every downbeat, and downbeats force an extra
@@ -1141,11 +1179,15 @@ function updateBossFieldSprite() {
   if (bossField.diveState === 'idle') {
     bossField.broccoliTimer--;
     if (bossField.broccoliTimer <= 0) {
-      const count = 3 + Math.floor(Math.random() * 3); // 3-5 florets
+      // ESCALATION — as the final round wears the boss down, each burst
+      // grows and the gap between bursts shrinks, so the closer you get
+      // to finishing it the denser the barrage becomes.
+      const prog = Math.min(1, Math.max(0, 1 - (bossHp / (bossMaxHp * 0.5))));
+      const count = 3 + Math.floor(prog * 6) + Math.floor(Math.random() * 3); // 3-11
       const baseAngle = Math.random() * Math.PI * 2;
       for (let i = 0; i < count; i++) {
         const a = baseAngle + (i / count) * Math.PI * 2;
-        const speed = 1.6 + Math.random() * 0.7;
+        const speed = 1.6 + prog * 0.7 + Math.random() * 0.7;
         broccoliList.push({
           x: bossField.x, y: bossField.y,
           vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
@@ -1153,9 +1195,11 @@ function updateBossFieldSprite() {
           rot: a, rotSpeed: (Math.random() - 0.5) * 0.2
         });
       }
-      dialogue.textContent = "* The broccoli sheds HOMING florets that lock onto you!";
+      dialogue.textContent = prog > 0.6
+        ? "* The broccoli erupts with a storm of HOMING florets!"
+        : "* The broccoli sheds HOMING florets that lock onto you!";
       fireAttackWarning('⚠ HOMING FLORETS ⚠');
-      bossField.broccoliTimer = 70 + Math.random() * 40;
+      bossField.broccoliTimer = (105 - prog * 60) + Math.random() * (55 - prog * 30);
     }
   }
 
@@ -1225,6 +1269,139 @@ function endSlideMode() {
   slideAtkTimer = 0;
   broccoliList = broccoliList.filter(b => !b.snare);
   dialogue.textContent = "* The floor settles. Normal movement returns.";
+}
+
+// ===== BLACKOUT MODE =====
+// The arena goes dark except for a shrinking pool of light around you.
+// Attacks still come, but you only see them once they're close, so it
+// becomes a listening/reading exercise instead of a pure reflex one.
+let blackoutMode = false;
+let blackoutTimer = 0;
+let blackoutCooldown = 1500;
+const BLACKOUT_DURATION = 400;
+const BLACKOUT_RADIUS = 82;
+
+function startBlackoutMode() {
+  blackoutMode = true;
+  blackoutTimer = BLACKOUT_DURATION;
+  fireAttackWarning('\u26a0 BLACKOUT \u26a0');
+  dialogue.textContent = "* The lights die! You can only see what's near you.";
+}
+function endBlackoutMode() {
+  blackoutMode = false;
+  blackoutCooldown = 1400 + Math.random() * 700;
+  dialogue.textContent = "* The lights flicker back on.";
+}
+function updateBlackoutMode() {
+  if (!blackoutMode) {
+    if (phase >= 2 && phase < 4 && !beatClockActive && !slideMode && !vortexMode) {
+      blackoutCooldown--;
+      if (blackoutCooldown <= 0) startBlackoutMode();
+    }
+    return;
+  }
+  blackoutTimer--;
+  if (blackoutTimer <= 0) endBlackoutMode();
+}
+// drawn last, over everything, so it actually occludes the arena
+function drawBlackout() {
+  if (!blackoutMode) return;
+  // fade the darkness in and out so it never snaps on abruptly
+  const fadeIn = Math.min(1, (BLACKOUT_DURATION - blackoutTimer) / 45);
+  const fadeOut = Math.min(1, blackoutTimer / 45);
+  const strength = Math.min(fadeIn, fadeOut);
+  const r = BLACKOUT_RADIUS + Math.sin(frame * 0.08) * 6;
+  ctx.save();
+  const grad = ctx.createRadialGradient(player.x, player.y, r * 0.35, player.x, player.y, r);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, `rgba(0,0,0,${0.94 * strength})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  // everything past the light pool is fully dark
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(0,0,0,${0.94 * strength})`;
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.arc(player.x, player.y, r, 0, Math.PI * 2, true);
+  ctx.fill('evenodd');
+  ctx.restore();
+}
+
+// ===== VORTEX MODE =====
+// The boss opens a suction well in the middle of the arena that drags you
+// steadily inward. Movement still works, but you have to fight the pull,
+// so holding a safe edge costs you constant effort.
+let vortexMode = false;
+let vortexTimer = 0;
+let vortexCooldown = 2100;
+let vortexX = 0, vortexY = 0;
+const VORTEX_DURATION = 380;
+const VORTEX_PULL = 0.19;
+
+function startVortexMode() {
+  vortexMode = true;
+  vortexTimer = VORTEX_DURATION;
+  vortexX = W / 2;
+  vortexY = H / 2;
+  fireAttackWarning('\u26a0 VORTEX \u26a0');
+  dialogue.textContent = "* A suction well tears open \u2014 don't get dragged in!";
+}
+function endVortexMode() {
+  vortexMode = false;
+  vortexCooldown = 1900 + Math.random() * 900;
+  dialogue.textContent = "* The vortex collapses.";
+}
+function updateVortexMode() {
+  if (!vortexMode) {
+    if (phase >= 3 && phase < 4 && !beatClockActive && !slideMode && !blackoutMode) {
+      vortexCooldown--;
+      if (vortexCooldown <= 0) startVortexMode();
+    }
+    return;
+  }
+  vortexTimer--;
+  if (vortexTimer <= 0) { endVortexMode(); return; }
+
+  // steady inward pull, stronger the closer you already are
+  const dx = vortexX - player.x, dy = vortexY - player.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const falloff = Math.max(0.35, Math.min(1, 200 / dist));
+  player.vx += (dx / dist) * VORTEX_PULL * falloff;
+  player.vy += (dy / dist) * VORTEX_PULL * falloff;
+
+  // sitting in the eye of it hurts, so it can't just be ridden out
+  if (dist < 26 && player.invulnTimer <= 0 && !godMode) {
+    playerHp -= player.blocking ? 6 * 0.35 : 6;
+    player.invulnTimer = 34;
+    shakeTime = 12; shakeMag = 5;
+  }
+}
+function drawVortex() {
+  if (!vortexMode) return;
+  const fade = Math.min(1, Math.min(VORTEX_DURATION - vortexTimer, vortexTimer) / 40);
+  ctx.save();
+  ctx.globalAlpha = fade;
+  // rotating suction rings
+  for (let i = 0; i < 4; i++) {
+    const rr = 30 + i * 34 + Math.sin(frame * 0.05 + i) * 5;
+    ctx.strokeStyle = `rgba(150,90,255,${0.5 - i * 0.09})`;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([12, 9]);
+    ctx.lineDashOffset = frame * (1.6 + i * 0.5);
+    ctx.beginPath();
+    ctx.arc(vortexX, vortexY, rr, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  const core = ctx.createRadialGradient(vortexX, vortexY, 0, vortexX, vortexY, 34);
+  core.addColorStop(0, 'rgba(220,180,255,0.85)');
+  core.addColorStop(0.6, 'rgba(140,70,240,0.45)');
+  core.addColorStop(1, 'rgba(90,30,180,0)');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(vortexX, vortexY, 34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function updateSlideMode() {
@@ -1316,9 +1493,9 @@ const PARRY_DMG = 6;
 
 // Heal Item (H) — limited-use ketchup packet, usable anytime
 let hJustPressed = false;
-let healCharges = 1;
+let healCharges = 3;
 const HEAL_AMOUNT = 20;
-const MAX_HEAL_CHARGES = 3;
+const MAX_HEAL_CHARGES = 5;
 
 // Ketchup pickups — drift across the box during the boss's attack phase;
 // touch one to refill a heal charge (capped at MAX_HEAL_CHARGES)
@@ -1434,7 +1611,7 @@ function initGame() {
   parryActive = false;
   parryTimer = 0;
   parryCooldown = 0;
-  healCharges = 1;
+  healCharges = 3;
   healText.textContent = '🍅 x' + healCharges;
   ketchupList = [];
   ketchupTimer = 0;
@@ -1479,6 +1656,12 @@ function initGame() {
   slideAtkTimer = 0;
   slideAtkIndex = 0;
   scorchRail = null;
+  blackoutMode = false;
+  blackoutTimer = 0;
+  blackoutCooldown = 1500;
+  vortexMode = false;
+  vortexTimer = 0;
+  vortexCooldown = 2100;
   gatlingActive = false;
   gatlingProgress = 0;
   gatlingShotsLeft = 0;
@@ -1500,6 +1683,7 @@ function initGame() {
   beatClockActive = savedCheckpointCount === MAX_BOSS_RESPAWNS; // resume straight into the final round if that's where you left off
   lastBeatIndex = -1;
   lastBeatIndexRound2 = -1;
+  lastBeatIndexRound1 = -1;
   // MEGALOVANIA plays for round 1 only; "Skeletal Shenanigans" for round 2
   // only — start/resume whichever one matches where this run begins
   startTrack.pause();
@@ -1628,7 +1812,7 @@ function spawnBroccoli() {
   broccoliList.push({
     x: fromLeft ? -20 : W + 20,
     y: y,
-    vx: (fromLeft ? 1 : -1) * (1.9 + phase * 0.65 + Math.random() * 0.8),
+    vx: (fromLeft ? 1 : -1) * (1.4 + phase * 0.45 + Math.random() * 0.6),
     vy: (Math.random() - 0.5) * 1.6,
     r: 12,
     homing,
@@ -1636,12 +1820,12 @@ function spawnBroccoli() {
     rotSpeed: (Math.random() - 0.5) * 0.2
   });
   // occasionally spawn a vertical drop too
-  if (Math.random() < 0.55) {
+  if (Math.random() < 0.12 + phase * 0.12) {
     broccoliList.push({
       x: 20 + Math.random() * (W - 40),
       y: -20,
       vx: (Math.random() - 0.5) * 1.6,
-      vy: 1.9 + phase * 0.65,
+      vy: 1.4 + phase * 0.45,
       r: 12,
       homing: phase >= 3 && Math.random() < 0.4,
       rot: Math.random() * Math.PI * 2,
@@ -1954,7 +2138,7 @@ function updateBoomerangs() {
 
 function updateSpiral() {
   spiralTimer++;
-  const interval = Math.max(220, 520 - phase * 100);
+  const interval = Math.max(340, 700 - phase * 100);
   if (!spiralActive && spiralTimer > interval) {
     spiralActive = true;
     spiralShotsLeft = 20 + phase * 4;
@@ -1964,7 +2148,7 @@ function updateSpiral() {
     bossEmoji.style.transition = 'transform 0.15s linear';
   }
   if (spiralActive) {
-    if (frame % 2 === 0) {
+    if (frame % 3 === 0) {
       const speed = 1.4 + phase * 0.2;
       broccoliList.push({
         x: W / 2,
@@ -2564,7 +2748,7 @@ function updateTurrets() {
       // track's real playback position, so every turret shot lands
       // exactly on a beat of "Skeletal Shenanigans" with no drift
       const respawnBonus = (bossRespawnCount - 1) * 20;
-      const rawCooldown = Math.max(45, 180 - phase * 30 - respawnBonus) + Math.random() * 30;
+      const rawCooldown = Math.max(75, 240 - phase * 30 - respawnBonus) + Math.random() * 45;
       const beatsAhead = Math.max(4, Math.round(rawCooldown / (BEAT_PERIOD_SEC * 60 * GLOBAL_TIME_SCALE)));
       t.cooldown = ticksUntilBeatsAhead(beatsAhead);
       t.flashTimer = 20;
@@ -2694,7 +2878,7 @@ function updateGatling() {
 let swarmTimer = 0;
 function updateSwarm() {
   swarmTimer++;
-  const interval = Math.max(460, 900 - phase * 120);
+  const interval = Math.max(620, 1150 - phase * 120);
   if (phase >= 2 && swarmTimer > interval) {
     swarmTimer = 0;
     const count = 4 + phase;
@@ -2719,7 +2903,7 @@ function updateSwarm() {
 let snipeTimer = 0;
 function updateCornerSnipe() {
   snipeTimer++;
-  const interval = Math.max(360, 700 - phase * 100);
+  const interval = Math.max(520, 950 - phase * 100);
   if (phase >= 3 && snipeTimer > interval) {
     snipeTimer = 0;
     const speed = 2.4 + phase * 0.3;
@@ -3181,19 +3365,28 @@ function update() {
 
   // slide mode overrides normal movement entirely while it's active
   updateSlideMode();
+  updateBlackoutMode();
+  updateVortexMode();
 
   // gentle lean in the direction of travel + a light squash for bounce
   player.tilt += ((-player.vx * 2.5) - player.tilt) * 0.15;
   const travelSpeed = Math.min(1, spd / maxSpeed);
   player.squash += ((1 - travelSpeed * 0.12) - player.squash) * 0.2;
 
-  // fading motion trail while moving
+  // fading motion trail while moving. Updated in place (no map/filter
+  // allocations every frame) and length-capped, which keeps GC pressure
+  // and draw cost flat instead of scaling with how long you've been moving.
   if (spd > 0.4) {
     player.trail.push({ x: player.x, y: player.y, life: 1 });
   }
-  player.trail = player.trail
-    .map(t => ({ ...t, life: t.life - 0.09 }))
-    .filter(t => t.life > 0);
+  let writeIdx = 0;
+  for (let i = 0; i < player.trail.length; i++) {
+    const t = player.trail[i];
+    t.life -= 0.09;
+    if (t.life > 0) player.trail[writeIdx++] = t;
+  }
+  player.trail.length = writeIdx;
+  if (player.trail.length > 14) player.trail.splice(0, player.trail.length - 14);
 
   const bounced = player.x <= player.r || player.x >= W - player.r ||
                   player.y <= player.r || player.y >= H - player.r;
@@ -3310,7 +3503,7 @@ function update() {
   // shooting via QTE — SPACE opens the timing bar, SPACE again locks it in.
   // Only usable while an attack-cycle opening is active (never during phase 4).
   if (qteActive) {
-    const qteSpeed = 0.022 + phase * 0.005;
+    const qteSpeed = 0.015 + phase * 0.003;
     qtePos += qteDir * qteSpeed;
     if (qtePos >= 1) { qtePos = 1; qteDir = -1; }
     else if (qtePos <= 0) { qtePos = 0; qteDir = 1; }
@@ -3384,21 +3577,21 @@ function update() {
   }
 
   // phase escalation
-  if (bossHp < bossMaxHp * 0.68 && phase === 1) {
+  if (bossHp < bossMaxHp * 0.55 && phase === 1) {
     phase = 2;
     dialogue.textContent = dialogueLines[2];
     bossEmoji.style.transform = 'scale(1.2)';
     bossEmoji.style.filter = 'drop-shadow(0 0 8px #6cff8f)';
     firePhaseTransition('PHASE 2', '0.2');
   }
-  if (bossHp < bossMaxHp * 0.32 && phase === 2) {
+  if (bossHp < bossMaxHp * 0.24 && phase === 2) {
     phase = 3;
     dialogue.textContent = dialogueLines[5];
     bossEmoji.style.transform = 'scale(1.4) rotate(6deg)';
     bossEmoji.style.filter = 'drop-shadow(0 0 14px #ffbb33) saturate(1.4)';
     firePhaseTransition('PHASE 3 — FURY', '0.42');
   }
-  if (bossHp < bossMaxHp * 0.14 && phase === 3) {
+  if (bossHp < bossMaxHp * 0.10 && phase === 3) {
     phase = 4;
     dialogue.textContent = "* The broccoli is DESPERATE! It gives up the fight — just hanging on now...";
     bossEmoji.style.transform = 'scale(1.6) rotate(-8deg)';
@@ -3444,8 +3637,19 @@ function update() {
       // built around the top/bottom rails you snap between
       updateSlideModeAttacks();
     } else if (bossRespawnCount < 1) {
+      // ROUND 1 — while the opening track is playing, quantize the two
+      // main attack timers to its beat grid so barrages land on the music
+      // rather than on arbitrary ticks
+      const beatLocked = round1BeatActive();
+      const beatTicks = ROUND1_BEAT_PERIOD_SEC * 60 * GLOBAL_TIME_SCALE;
+
       spawnTimer++;
-      const spawnRate = Math.max(7, 24 - phase * 5);
+      let spawnRate = Math.max(14, 54 - phase * 10);
+      if (beatLocked) {
+        // snap to the nearest whole subdivision of a beat (min an eighth note)
+        const sub = Math.max(1, Math.round(spawnRate / (beatTicks / 2)));
+        spawnRate = sub * (beatTicks / 2);
+      }
       if (spawnTimer > spawnRate) {
         spawnBroccoli();
         spawnTimer = 0;
@@ -3455,7 +3659,12 @@ function update() {
       }
 
       waveTimer++;
-      const waveInterval = Math.max(130, 320 - phase * 75);
+      let waveInterval = Math.max(210, 460 - phase * 80);
+      if (beatLocked) {
+        // waves land on whole bars (4 beats) so they read as musical hits
+        const bars = Math.max(1, Math.round(waveInterval / (beatTicks * 4)));
+        waveInterval = bars * beatTicks * 4;
+      }
       if (waveTimer > waveInterval) {
         spawnWave();
         waveTimer = 0;
@@ -3519,9 +3728,18 @@ function update() {
     b.y += b.vy * moveScale;
     b.rot = (b.rot || 0) + (b.rotSpeed || 0) * moveScale;
     if (b.missile) {
-      b.trail = b.trail || [];
+      // in-place trail update, capped — avoids two array allocations per
+      // missile per frame, which was a steady source of GC churn
+      if (!b.trail) b.trail = [];
       b.trail.push({ x: b.x, y: b.y, life: 1 });
-      b.trail = b.trail.map(p => ({ ...p, life: p.life - 0.09 })).filter(p => p.life > 0);
+      let w = 0;
+      for (let i = 0; i < b.trail.length; i++) {
+        const p = b.trail[i];
+        p.life -= 0.09;
+        if (p.life > 0) b.trail[w++] = p;
+      }
+      b.trail.length = w;
+      if (b.trail.length > 12) b.trail.splice(0, b.trail.length - 12);
     }
   }
   // snare florets sit in place for a set lifetime, then dissolve
@@ -3532,6 +3750,13 @@ function update() {
     !(b.snare && b.life !== undefined && b.life <= 0) &&
     b.x > -40 && b.x < W + 40 && b.y > -40 && b.y < H + 40
   );
+  // hard cap on live projectiles — when several attacks overlap the list
+  // could balloon and tank the frame rate. Dropping the oldest keeps
+  // perf flat and, as a side effect, makes big pile-ups survivable.
+  const MAX_PROJECTILES = 90;
+  if (broccoliList.length > MAX_PROJECTILES) {
+    broccoliList.splice(0, broccoliList.length - MAX_PROJECTILES);
+  }
 
   // update burgers
   for (let bg of burgerList) {
@@ -3583,6 +3808,7 @@ function update() {
   }
 
   updateFinalRoundBeat();
+  updateRound1BeatPulse();
   updateRound2BeatPulse();
   updateBossFieldSprite();
   updateJelly();
@@ -3827,6 +4053,7 @@ function draw() {
   drawViseTelegraph();
   drawBossDiveTelegraph();
   drawRailScorch();
+  drawVortex();
   drawBossLandingFlash();
   drawLaser();
 
@@ -3962,6 +4189,9 @@ function draw() {
   }
 
   ctx.restore();
+
+  // blackout goes absolutely last so it occludes the whole arena
+  drawBlackout();
 }
 
 function endGame(won) {
