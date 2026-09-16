@@ -154,6 +154,51 @@
     padding: 8px 22px; background: #7fd4ff; color: #06111a;
     border: none; cursor: pointer; text-shadow: none;
   }
+  .diffBtn.diffExtreme { border-color: #ff3b2f; color: #ff8c7f; }
+  .diffBtn.diffExtreme:hover { background: #ff3b2f; color: #fff; border-color: #ff3b2f; }
+  .diffBtn.diffExtreme.active { background: #ff3b2f; color: #fff; border-color: #ff3b2f; }
+  #warnPanel {
+    position: fixed; inset: 0; background: rgba(8,0,0,0.94);
+    display: none; align-items: center; justify-content: center; z-index: 320;
+  }
+  #warnBox {
+    background: #150a0a; border: 3px solid #ff3b2f;
+    box-shadow: 0 0 40px rgba(255,59,47,0.45), inset 0 0 50px rgba(0,0,0,0.7);
+    padding: 22px 28px; text-align: center; max-width: 92vw;
+  }
+  #warnSkull {
+    font-size: 46px; line-height: 1;
+    animation: warnPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes warnPulse {
+    0%,100% { transform: scale(1); opacity: 0.85; }
+    50% { transform: scale(1.14); opacity: 1; }
+  }
+  #warnTitle {
+    font-size: 26px; letter-spacing: 6px; color: #ff6b5f; margin: 6px 0 2px;
+    text-shadow: 0 0 18px #ff3b2f;
+  }
+  #warnSub { font-size: 11px; letter-spacing: 3px; color: #9d9dae; margin-bottom: 14px; }
+  #warnList { text-align: left; margin-bottom: 12px; }
+  .warnRow { display: flex; gap: 10px; font-size: 11px; padding: 4px 0; align-items: baseline; }
+  .warnRow b {
+    color: #ff6b5f; min-width: 38px; text-align: right;
+    font-size: 13px;
+  }
+  .warnRow span { color: #cfcfdd; }
+  #warnNote {
+    font-size: 10px; color: #9d9dae; letter-spacing: 1px;
+    border-top: 1px solid #3a2222; padding-top: 10px; margin-bottom: 14px;
+  }
+  #warnBtns { display: flex; gap: 10px; justify-content: center; }
+  #warnCancel, #warnConfirm {
+    font-family: inherit; font-size: 12px; letter-spacing: 2px;
+    padding: 8px 18px; cursor: pointer; text-shadow: none; border: 2px solid;
+  }
+  #warnCancel { background: transparent; color: #9d9dae; border-color: #3a3a52; }
+  #warnCancel:hover { background: #3a3a52; color: #fff; }
+  #warnConfirm { background: #ff3b2f; color: #fff; border-color: #ff3b2f; }
+  #warnConfirm:hover { background: #ff6b5f; }
   #resultsPanel {
     position: fixed;
     inset: 0;
@@ -1214,6 +1259,25 @@
   </div>
 </div>
 
+<div id="warnPanel">
+  <div id="warnBox">
+    <div id="warnSkull">☠</div>
+    <div id="warnTitle">GO TRY LAH</div>
+    <div id="warnSub">Sure or not?</div>
+    <div id="warnList">
+      <div class="warnRow"><b>3×</b><span>projectile density — the screen fills up fast</span></div>
+      <div class="warnRow"><b>2×</b><span>game speed — everything runs at full real time</span></div>
+      <div class="warnRow"><b>55</b><span>starting health, and only 1 ketchup charge</span></div>
+      <div class="warnRow"><b>1.5×</b><span>damage taken from everything</span></div>
+    </div>
+    <div id="warnNote">This is not balanced. It is not meant to be fair. Good luck.</div>
+    <div id="warnBtns">
+      <button id="warnCancel">NEVER MIND</button>
+      <button id="warnConfirm">GO LAH</button>
+    </div>
+  </div>
+</div>
+
 <div id="resultsPanel">
   <div id="resultsBox">
     <div id="resultTitle">STEAMED</div>
@@ -1254,6 +1318,7 @@
   <button class="diffBtn" data-diff="easy">EASY</button>
   <button class="diffBtn active" data-diff="normal">NORMAL</button>
   <button class="diffBtn" data-diff="brutal">BRUTAL</button>
+  <button class="diffBtn diffExtreme" data-diff="gotrylah">☠ GO TRY LAH</button>
 </div>
 <button id="restartBtn">FIGHT AGAIN</button>
 <div id="instructions">On touch devices, mobile mode kicks in automatically (📱 mobile toggle in the corner lets you flip it by hand too) — drag the joystick to move and tap the buttons for everything below. Click the game box first. Arrow keys / WASD: move &nbsp;|&nbsp; Q: teleport dash &nbsp;|&nbsp; Hold E: block (less damage, slower move) &nbsp;|&nbsp; R: parry &nbsp;|&nbsp; H: heal with a ketchup packet (grab 🍅 pickups to restock, up to 4) &nbsp;|&nbsp; T: taunt — rush the next opening &nbsp;|&nbsp; C: Freeze Shake &nbsp;|&nbsp; Survive until the border flashes gold, then SPACE for a timed burger QTE, F for a milkshake, G for fries, or U for your ULTIMATE once the combo bar is full &nbsp;|&nbsp; TATTLE for intel &nbsp;|&nbsp; Watch for spiral barrages, radial bursts, the Tattle Tail's strike, ranch puddles, the kernel gatling, and (phase 3) steam beams — single columns, sideways rows, narrow twin gaps, or a full wall &nbsp;|&nbsp; Below 10% HP there's no more fighting back — no openings, no attacking — but the boss still floods the screen with beam walls in random patterns (single or double gaps, vertical or horizontal, crosses, even double crosses) while its HP ticks down on its own (0.1% per second) until it's over. Just survive! Beating the boss down to 0 HP triggers a CHECKPOINT — it regenerates to 50% and comes back fighting purely through its turrets and beams, with all its old broccoli-based attacks gone for good, PLUS the turrets outside the box reveal themselves and start firing lock-on beams and heat-seeking missiles, and the boss itself now fires its own golden stunning beam that snaps to your exact position and can't be outrun — it hits lighter but locks up your controls for a moment. Dashing through it (Q) or blocking (E) are the only ways to avoid the stun. This can happen TWICE. The first time is a normal comeback at 50% HP, fighting through turrets and beams. The second (and final) time, the turrets and beams stand down for good, PARRYING NO LONGER WORKS, and a beat kicks in (synced kick/hat drum, a pulse on every downbeat): the broccoli SLAMS down from above the box in a dramatic entrance (screen shake + impact flash), the portrait over the boss bar fading out the instant it lands. From there it can't dive or touch you, but it does periodically shed a few real florets straight off its own body that shoot outward and can home in — dodge those — while otherwise just wandering harmlessly and taking 0.2% of its max HP in self-damage every time its old ring/aimed/cross/homing patterns would have fired, with downbeats speeding that self-damage up further. Beat that down for the real win. If YOU die at any point, you don't start over from scratch — dying resumes the fight from the last checkpoint you actually reached (the button will say RETRY FROM CHECKPOINT), so a death in the final round only sends you back to the start of that round, not all the way to round one.</div>
@@ -1790,7 +1855,7 @@ function endSlideMode() {
   slideMode = false;
   sliding = false;
   canvas.classList.remove('slideMode');
-  slideModeCooldown = 420 + Math.random() * 220;
+  slideModeCooldown = (difficulty === 'gotrylah' ? 150 : 420) + Math.random() * 220;
   // clear any rail-specific state so it can't bleed into normal play
   scorchRail = null;
   slideAtkTimer = 0;
@@ -1817,7 +1882,7 @@ function startBlackoutMode() {
 }
 function endBlackoutMode() {
   blackoutMode = false;
-  blackoutCooldown = 650 + Math.random() * 350;
+  blackoutCooldown = (difficulty === 'gotrylah' ? 220 : 650) + Math.random() * 350;
   dialogue.textContent = "* The lights flicker back on.";
 }
 function updateBlackoutMode() {
@@ -1876,7 +1941,7 @@ function startVortexMode() {
 }
 function endVortexMode() {
   vortexMode = false;
-  vortexCooldown = 880 + Math.random() * 440;
+  vortexCooldown = (difficulty === 'gotrylah' ? 300 : 880) + Math.random() * 440;
   dialogue.textContent = "* The vortex collapses.";
 }
 function updateVortexMode() {
@@ -1948,7 +2013,7 @@ function startMirrorMode() {
 }
 function endMirrorMode() {
   mirrorMode = false;
-  mirrorCooldown = 780 + Math.random() * 400;
+  mirrorCooldown = (difficulty === 'gotrylah' ? 260 : 780) + Math.random() * 400;
   dialogue.textContent = "* Your bearings snap back to normal.";
 }
 function updateMirrorMode() {
@@ -2004,7 +2069,7 @@ function startCrushMode() {
 function endCrushMode() {
   crushMode = false;
   crushInset = 0;
-  crushCooldown = 1000 + Math.random() * 500;
+  crushCooldown = (difficulty === 'gotrylah' ? 340 : 1000) + Math.random() * 500;
   dialogue.textContent = "* The walls grind back open.";
 }
 function updateCrushMode() {
@@ -2060,7 +2125,7 @@ function startSlickMode() {
 }
 function endSlickMode() {
   slickMode = false;
-  slickCooldown = 860 + Math.random() * 440;
+  slickCooldown = (difficulty === 'gotrylah' ? 290 : 860) + Math.random() * 440;
   dialogue.textContent = "* The floor grips again.";
 }
 function updateSlickMode() {
@@ -2122,7 +2187,7 @@ function startBoxDragMode() {
 function endBoxDragMode() {
   boxDragMode = false;
   boxTargX = 0; boxTargY = 0;
-  boxDragCooldown = 950 + Math.random() * 500;
+  boxDragCooldown = (difficulty === 'gotrylah' ? 320 : 950) + Math.random() * 500;
   shovePhase = 'idle';
   boxShover.style.display = 'none';
   boxShover.classList.remove('straining');
@@ -2278,13 +2343,46 @@ function applyBoxTransform() {
 }
 
 // only one special mode runs at a time — each mode asks this before starting
+// how many arena modes may run at once. Every difficulty keeps them
+// exclusive; GO TRY LAH stacks 2-3 of them simultaneously.
+let gotrylahModeCap = 3;
+function maxConcurrentModes() {
+  return difficulty === 'gotrylah' ? gotrylahModeCap : 1;
+}
+function activeModeCount() {
+  return [slideMode, blackoutMode, vortexMode, mirrorMode,
+          crushMode, slickMode, boxDragMode].filter(Boolean).length;
+}
+// Some pairings are genuinely unplayable rather than just hard, so they stay
+// blocked even on GO TRY LAH:
+//   slide + crush   — rails snap you to the box edge, which crush turns into
+//                     a wall, so you'd be slammed into damage with no counter
+//   slide + boxdrag — slide anchors you to a rail while boxdrag anchors you
+//                     to the screen; the two fight over your position
+const MODE_CONFLICTS = {
+  slide:   ['crush', 'boxdrag'],
+  crush:   ['slide'],
+  boxdrag: ['slide']
+};
+function modeConflicts(self) {
+  const active = {
+    slide: slideMode, blackout: blackoutMode, vortex: vortexMode,
+    mirror: mirrorMode, crush: crushMode, slick: slickMode,
+    boxdrag: boxDragMode
+  };
+  const bad = MODE_CONFLICTS[self] || [];
+  return bad.some(k => active[k]);
+}
+
 function anyOtherModeActive(self) {
   const active = {
     slide: slideMode, blackout: blackoutMode, vortex: vortexMode,
     mirror: mirrorMode, crush: crushMode, slick: slickMode,
     boxdrag: boxDragMode
   };
-  return Object.keys(active).some(k => k !== self && active[k]);
+  const others = Object.keys(active).filter(k => k !== self && active[k]).length;
+  if (modeConflicts(self)) return true;          // never allow a broken pairing
+  return others >= maxConcurrentModes();
 }
 
 function updateSlideMode() {
@@ -2579,6 +2677,66 @@ const LIMB_REGEN_DELAY = 480;
 // so a slow fight becomes progressively unwinnable. This is what makes it
 // the hardest of the three rather than just the tankiest.
 let carrotMastery = 0;
+
+// Picks an attack index at random so repeats are possible, while still
+// leaning away from endless spam of one move. On GO TRY LAH the repeat
+// chance is raised, because back-to-back barrages are the whole point.
+let lastAtkPick = {};
+function pickAttack(key, count) {
+  const prev = lastAtkPick[key];
+  const repeatChance = difficulty === 'gotrylah' ? 0.45 : 0.28;
+  let pick;
+  if (prev !== undefined && Math.random() < repeatChance) {
+    pick = prev;                       // deliberate back-to-back repeat
+  } else {
+    pick = Math.floor(Math.random() * count);
+  }
+  lastAtkPick[key] = pick;
+  return pick;
+}
+
+// how many copies of the chosen attack go out at once
+function castCount() {
+  const doubleChance = difficulty === 'gotrylah' ? 0.55
+                     : difficulty === 'brutal'   ? 0.28
+                     : difficulty === 'easy'     ? 0.06
+                     : 0.16;
+  return Math.random() < doubleChance ? 2 : 1;
+}
+// runs an attack `castCount()` times, staggering repeats slightly
+function multiCast(fn) {
+  const n = castCount();
+  fn();
+  for (let i = 1; i < n; i++) {
+    const delay = 90 + i * 70;
+    setTimeout(() => {
+      if (!gameOver && !paused && !introPlaying) fn();
+    }, delay);
+  }
+  return n;
+}
+
+// TRIPLE BARRAGE — 20% of the time an attack chains three times back-to-back,
+// mirroring how the last-stand beam walls roll straight into one another.
+const TRIPLE_BARRAGE_CHANCE = 0.20;
+function barrageCast(fn, label) {
+  if (Math.random() < TRIPLE_BARRAGE_CHANCE) {
+    fn();
+    for (let i = 1; i < 3; i++) {
+      setTimeout(() => {
+        if (!gameOver && !paused && !introPlaying) fn();
+      }, i * 260);
+    }
+    if (label) {
+      dialogue.textContent = `* ${label} \u2014 THREE IN A ROW!`;
+      fireAttackWarning('\u26a0 TRIPLE ' + label + ' \u26a0');
+    }
+    shakeTime = Math.max(shakeTime, 14);
+    shakeMag = Math.max(shakeMag, 6);
+    return 3;
+  }
+  return multiCast(fn);
+}
 const MASTERY_CAP = 4; // hard ceiling, so it can never spiral out of reach
 function cappedMastery() { return Math.min(carrotMastery, MASTERY_CAP); }
 function masteryAtkMul()  { return 1 / (1 + cappedMastery() * 0.07); } // shorter gaps
@@ -2626,6 +2784,7 @@ function updateCarrotGuard() {
     } else if (carrotGuard.stage === 'hold' && carrotGuard.timer > GUARD_HOLD) {
       carrotGuard = null;
   carrotMastery = 0;
+  lastAtkPick = {};
   roamFists = [];
   mirrorSelf = null;
       dialogue.textContent = "* Its guard drops. Now!";
@@ -2695,12 +2854,13 @@ function updateCarrotAttacks() {
 
   // cycle only through limbs that still work
   const usable = livingParts();
-  const part = usable[carrotStance % usable.length];
+  const part = usable[pickAttack('carrot', usable.length)];
   carrotStance++;
 
-  if (part.key === 'left')       carrotJabBarrage(part);
-  else if (part.key === 'right') carrotHookShockwave(part);
-  else                           carrotSweepKick(part);
+  // multiCast lets the same limb strike twice simultaneously
+  if (part.key === 'left')       multiCast(() => carrotJabBarrage(part));
+  else if (part.key === 'right') multiCast(() => carrotHookShockwave(part));
+  else                           multiCast(() => carrotSweepKick(part));
 }
 
 // LEFT FIST — a fast, tight stream of jabs aimed at you
@@ -2843,7 +3003,7 @@ function updatePepperAttacks() {
   if (pepperAtkTimer < interval) return;
   pepperAtkTimer = 0;
 
-  const pattern = pepperAtkIndex % 4;
+  const pattern = pickAttack('pepper', 4);
   pepperAtkIndex++;
 
   // ENRAGE — below half HP the pepper starts chaining a second attack right
@@ -2861,7 +3021,7 @@ function updatePepperAttacks() {
 
   if (pattern === 0) {
     // EMBER FALL — fire pools bloom across the floor and linger
-    const n = 3 + phase;
+    const n = (3 + phase) * castCount();
     for (let i = 0; i < n; i++) {
       firePools.push({
         x: 34 + Math.random() * (W - 68),
@@ -2885,6 +3045,22 @@ function updatePepperAttacks() {
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         r: 9, homing: false, rot: a, rotSpeed: 0.3, flare: true
       });
+    }
+    if (castCount() > 1) {
+      // a second arc fanned off the first
+      setTimeout(() => {
+        if (gameOver || paused || bossType !== 'pepper') return;
+        const b2 = Math.atan2(player.y - 16, player.x - W / 2) + 0.5;
+        for (let i = 0; i < 7; i++) {
+          const a2 = b2 + (i - 3) * 0.16;
+          broccoliList.push({
+            x: W / 2, y: 16,
+            vx: Math.cos(a2) * (2.9 + phase * 0.35),
+            vy: Math.sin(a2) * (2.9 + phase * 0.35),
+            r: 9, homing: false, rot: a2, rotSpeed: 0.3, flare: true
+          });
+        }
+      }, 130);
     }
     dialogue.textContent = "* A FLAME ARC sweeps toward you!";
     fireAttackWarning('\u26a0 FLAME ARC \u26a0');
@@ -3791,8 +3967,13 @@ const DIFFICULTIES = {
   normal: { label: 'NORMAL', hp: 85,  heals: 3, healCap: 5,
             spawnMul: 1.0,  speedMul: 1.0,  dmgMul: 1.0 },
   brutal: { label: 'BRUTAL', hp: 65,  heals: 1, healCap: 3,
-            spawnMul: 0.72, speedMul: 1.18, dmgMul: 1.35 }
+            spawnMul: 0.72, speedMul: 1.18, dmgMul: 1.35 },
+  // GO TRY LAH — triple projectile density and the simulation unshackled to
+  // real time (everything else runs at 0.5, so this is genuinely double pace).
+  gotrylah: { label: 'GO TRY LAH', hp: 55, heals: 1, healCap: 3,
+            spawnMul: 1/3, speedMul: 1.25, dmgMul: 1.5, timeScale: 1.0 }
 };
+const DEFAULT_TIME_SCALE = 0.5;
 let difficulty = 'normal';
 function diff() { return DIFFICULTIES[difficulty]; }
 
@@ -3842,6 +4023,13 @@ function initGame() {
   paused = false;
   if (typeof pausePanel !== 'undefined' && pausePanel) pausePanel.style.display = 'none';
   if (typeof resultsPanel !== 'undefined' && resultsPanel) resultsPanel.style.display = 'none';
+  // a tier may run the whole simulation faster; everything else uses 0.5
+  GLOBAL_TIME_SCALE = diff().timeScale || DEFAULT_TIME_SCALE;
+  if (typeof admSpeed !== 'undefined' && admSpeed) {
+    admSpeed.value = GLOBAL_TIME_SCALE;
+    admSpeedVal.textContent = GLOBAL_TIME_SCALE.toFixed(1) + 'x';
+  }
+  gotrylahModeCap = 2 + Math.floor(Math.random() * 2); // 2 or 3 at once
   MAX_HEAL_CHARGES = diff().healCap;
   healCharges = diff().heals;
   // starting perk
@@ -3921,6 +4109,17 @@ function initGame() {
   boxDragMode = false;
   boxDragTimer = 0;
   boxDragCooldown = 1000;
+  // GO TRY LAH: shorten every mode timer so stacking starts early. This must
+  // come after the resets above, which would otherwise clobber it.
+  if (difficulty === 'gotrylah') {
+    slideModeCooldown = 120;
+    blackoutCooldown  = 180;
+    vortexCooldown    = 240;
+    mirrorCooldown    = 200;
+    crushCooldown     = 280;
+    slickCooldown     = 220;
+    boxDragCooldown   = 260;
+  }
   boxOffX = 0; boxOffY = 0;
   boxTargX = 0; boxTargY = 0;
   shovePhase = 'idle';
@@ -4105,6 +4304,20 @@ function spawnBroccoli() {
     rotSpeed: (Math.random() - 0.5) * 0.2
   });
   // occasionally spawn a vertical drop too
+  // GO TRY LAH fires additional broccoli alongside each spawn
+  const extra = difficulty === 'gotrylah' ? 2 : 0;
+  for (let e = 0; e < extra; e++) {
+    broccoliList.push({
+      x: 20 + Math.random() * (W - 40),
+      y: -20 - e * 26,
+      vx: (Math.random() - 0.5) * 1.6,
+      vy: (1.4 + phase * 0.45) * diff().speedMul,
+      r: 12,
+      homing: phase >= 2 && Math.random() < 0.3,
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.2
+    });
+  }
   if (Math.random() < 0.12 + phase * 0.12) {
     broccoliList.push({
       x: 20 + Math.random() * (W - 40),
@@ -4732,12 +4945,16 @@ function updateSpiral() {
   spiralTimer++;
   const interval = Math.max(340, 700 - phase * 100);
   if (!spiralActive && spiralTimer > interval) {
-    spiralActive = true;
-    spiralShotsLeft = 20 + phase * 4;
-    spiralAngle = Math.random() * Math.PI * 2;
     spiralTimer = 0;
-    dialogue.textContent = "* The broccoli spins up a SPIRAL BARRAGE!";
-    bossEmoji.style.transition = 'transform 0.15s linear';
+    barrageCast(() => {
+      spiralActive = true;
+      spiralShotsLeft = 20 + phase * 4;
+      spiralAngle = Math.random() * Math.PI * 2;
+      bossEmoji.style.transition = 'transform 0.15s linear';
+    }, 'SPIRAL');
+    if (!dialogue.textContent.includes('THREE IN A ROW')) {
+      dialogue.textContent = "* The broccoli spins up a SPIRAL BARRAGE!";
+    }
   }
   if (spiralActive) {
     if (frame % 3 === 0) {
@@ -4771,14 +4988,18 @@ function updateBurst() {
   const interval = Math.max(260, 520 - phase * 90);
   if (phase >= 2 && !burstState && burstTimer > interval) {
     burstTimer = 0;
-    burstState = {
-      x: 60 + Math.random() * (W - 120),
-      y: 90 + Math.random() * (H - 160),
-      stage: 'telegraph',
-      timer: 0
-    };
-    dialogue.textContent = "* Something is charging up nearby... get clear!";
-    fireAttackWarning('⚠ RADIAL BURST CHARGING ⚠');
+    barrageCast(() => {
+      burstState = {
+        x: 60 + Math.random() * (W - 120),
+        y: 90 + Math.random() * (H - 160),
+        stage: 'telegraph',
+        timer: 0
+      };
+    }, 'RADIAL BURST');
+    if (!dialogue.textContent.includes('THREE IN A ROW')) {
+      dialogue.textContent = "* Something is charging up nearby... get clear!";
+      fireAttackWarning('⚠ RADIAL BURST CHARGING ⚠');
+    }
   }
   if (burstState) {
     burstState.timer++;
@@ -5531,11 +5752,15 @@ function updateGatling() {
   gatlingTimer++;
   const interval = Math.max(340, 640 - phase * 90);
   if (!gatlingActive && gatlingTimer > interval) {
-    gatlingActive = true;
-    gatlingProgress = 0;
-    gatlingShotsLeft = 24 + phase * 5;
     gatlingTimer = 0;
-    dialogue.textContent = "* The boss revs up a KERNEL GATLING!";
+    barrageCast(() => {
+      gatlingActive = true;
+      gatlingProgress = 0;
+      gatlingShotsLeft = 24 + phase * 5;
+    }, 'KERNEL GATLING');
+    if (!dialogue.textContent.includes('THREE IN A ROW')) {
+      dialogue.textContent = "* The boss revs up a KERNEL GATLING!";
+    }
   }
   if (gatlingActive) {
     if (frame % 2 === 0) {
@@ -5773,7 +5998,7 @@ function updateSlideModeAttacks() {
   if (slideAtkTimer < interval) return;
   slideAtkTimer = 0;
 
-  const pattern = slideAtkIndex % 3;
+  const pattern = pickAttack('slide', 3);
   slideAtkIndex++;
 
   if (pattern === 0) {
@@ -5789,8 +6014,9 @@ function updateSlideModeAttacks() {
     // out of their path with A/D rather than just picking a rail
     const speed = 2.6 + phase * 0.4;
     const fromLeft = Math.random() < 0.5;
+    const volleys = castCount(); // a doubled volley stacks a second wave behind
     for (const edgeY of [18, H - 18]) {
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 3 * volleys; i++) {
         broccoliList.push({
           x: fromLeft ? -20 - i * 46 : W + 20 + i * 46,
           y: edgeY,
@@ -5805,11 +6031,11 @@ function updateSlideModeAttacks() {
   } else {
     // MIDLINE SNARE — a band of florets across the centre, punishing you
     // for lingering in the middle instead of committing to a rail
-    const count = 7;
+    const count = 7 * castCount(); // a doubled snare leaves almost no gap
     for (let i = 0; i < count; i++) {
       const x = 24 + (i / (count - 1)) * (W - 48);
       broccoliList.push({
-        x, y: H / 2,
+        x, y: H / 2 + (i % 2 === 0 ? 0 : 14),
         vx: (Math.random() - 0.5) * 0.6,
         vy: 0,
         r: 11, homing: false, rot: 0, rotSpeed: 0.2,
@@ -5878,13 +6104,17 @@ function spawnPuddleIfDue() {
   const interval = Math.max(380, 720 - phase * 80);
   if (phase >= 2 && puddleTimer > interval) {
     puddleTimer = 0;
-    puddleList.push({
-      x: 40 + Math.random() * (W - 80),
-      y: 60 + Math.random() * (H - 120),
-      r: 24,
-      life: 280
-    });
-    dialogue.textContent = "* A puddle of ranch spreads across the floor!";
+    barrageCast(() => {
+      puddleList.push({
+        x: 40 + Math.random() * (W - 80),
+        y: 60 + Math.random() * (H - 120),
+        r: 24,
+        life: 280
+      });
+    }, 'RANCH PUDDLE');
+    if (!dialogue.textContent.includes('THREE IN A ROW')) {
+      dialogue.textContent = "* A puddle of ranch spreads across the floor!";
+    }
   }
 }
 
@@ -6714,7 +6944,8 @@ function update() {
         waveInterval = bars * beatTicks * 4;
       }
       if (waveTimer > waveInterval) {
-        spawnWave();
+        // two walls can land together, and a barrage roll sends three
+        barrageCast(() => spawnWave(), 'WAVE');
         waveTimer = 0;
       }
 
@@ -7661,17 +7892,37 @@ document.querySelectorAll('.stageBtn').forEach(btn => {
 });
 
 // --- difficulty picker ---
+function applyDifficulty(d) {
+  difficulty = d;
+  document.querySelectorAll('.diffBtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.diff === d));
+  saveProgress();
+  refreshBestRecord();
+  // difficulty changes the whole run, so restart from the top rather than
+  // applying it halfway through an in-progress fight
+  savedCheckpointCount = 0;
+  initGame();
+}
+
+// GO TRY LAH is deliberately unfair, so it asks first rather than dropping
+// someone into it by a stray click
+const warnPanel = document.getElementById('warnPanel');
+document.getElementById('warnCancel').addEventListener('click', () => {
+  warnPanel.style.display = 'none';
+});
+document.getElementById('warnConfirm').addEventListener('click', () => {
+  warnPanel.style.display = 'none';
+  applyDifficulty('gotrylah');
+  dialogue.textContent = '* You asked for this.';
+});
+
 document.querySelectorAll('.diffBtn').forEach(btn => {
   btn.addEventListener('click', () => {
-    difficulty = btn.dataset.diff;
-    document.querySelectorAll('.diffBtn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    saveProgress();
-    refreshBestRecord();
-    // difficulty changes the whole run, so restart from the top rather than
-    // applying it halfway through an in-progress fight
-    savedCheckpointCount = 0;
-    initGame();
+    if (btn.dataset.diff === 'gotrylah' && difficulty !== 'gotrylah') {
+      warnPanel.style.display = 'flex';
+      return;
+    }
+    applyDifficulty(btn.dataset.diff);
   });
 });
 
