@@ -1165,6 +1165,11 @@
         <div class="moveRow"><b>T</b><span><b2>Perfect Taunt</b2> — at 70%+ combo it lands clean: no counter-attack, and the opening comes twice as fast</span></div>
         <div class="moveRow"><b>G</b><span><b2>Scatter Shot</b2> — at 60%+ combo the fan gets wider, denser and hits 50% harder</span></div>
         <div class="moveRow"><b>H</b><span><b2>Sugar Rush</b2> — at full health the packet is burned for +3 combo instead of being wasted</span></div>
+        <div class="moveHead" style="margin-top:12px;">SITUATIONAL VARIANTS</div>
+        <div class="moveRow"><b>Space</b><span><b2>Last Stand</b2> — below 25% health your burgers hit almost twice as hard</span></div>
+        <div class="moveRow"><b>R</b><span><b2>Vengeance</b2> — parry soon after taking a hit: double damage and a little health back</span></div>
+        <div class="moveRow"><b>F</b><span><b2>Drive-By</b2> — thrown mid-dash it becomes a three-shake spread along your dash line</span></div>
+        <div class="moveRow"><b>C</b><span><b2>Flare</b2> — used during a BLACKOUT it burns off early to light the arena back up</span></div>
         <div class="guideNote">Variants cost nothing extra — they trigger automatically when the condition is met.</div>
       </div>
     </div>
@@ -2364,6 +2369,7 @@ const MILKSHAKE_DMG = 5;
 // back at the boss instead of hurting you.
 let rJustPressed = false;
 let parryActive = false;
+let revengeTimer = 0; // counts down after you take a hit, enabling a stronger parry
 let parryTimer = 0;
 let parryCooldown = 0;
 const PARRY_WINDOW_LEN = 12;
@@ -2602,6 +2608,15 @@ function updateCarrotRegen() {
 let carrotGuard = null;
 const GUARD_WARN = 46, GUARD_HOLD = 80;
 function updateCarrotGuard() {
+  // an opening is the player's turn: drop any guard so the window is never
+  // silently wasted on deflected shots
+  if (attackWindowOpen || qteActive) {
+    if (carrotGuard) {
+      carrotGuard = null;
+      dialogue.textContent = "* Its guard drops — now's your chance!";
+    }
+    return;
+  }
   if (carrotGuard) {
     carrotGuard.timer++;
     if (carrotGuard.stage === 'warn' && carrotGuard.timer > GUARD_WARN) {
@@ -2666,8 +2681,6 @@ function drawCarrotGuard() {
 }
 
 function updateCarrotAttacks() {
-  updateCarrotRegen();
-  updateCarrotGuard();
   for (const p of carrotParts) if (p.flash > 0) p.flash--;
   updateCarrotFlurry();
 
@@ -2824,9 +2837,6 @@ let pepperAtkIndex = 0;
 let pepperCharge = null;
 
 function updatePepperAttacks() {
-  updateFirePools();
-  updateResidualHeat();
-  updatePepperCharge();
 
   pepperAtkTimer++;
   const interval = Math.max(70, 155 - phase * 24);
@@ -5992,21 +6002,44 @@ function drawTattleTail() {
   ctx.fillText('👀', tattleTail.x, tattleTail.y - 14);
 }
 
-function shootBurger(big) {
+function shootBurger(big, lastStand) {
+  const base = big ? 14 : 7;
   burgerList.push({
     x: player.x,
     y: player.y - player.r,
     vy: -6,
     wobble: 0,
-    dmg: big ? 14 : 7,
-    big: !!big
+    dmg: lastStand ? Math.round(base * 1.9) : base,
+    big: !!big,
+    lastStand: !!lastStand
   });
 }
 
-function throwMilkshake() {
+function throwMilkshake(driveBy) {
   // VARIANT: thrown while blocking it becomes a FROST SHAKE — trades some
   // damage for chilling every projectile on screen to a crawl
   const frost = player.blocking;
+  if (driveBy && !frost) {
+    // VARIANT: DRIVE-BY — hurled along your dash line as a spread of three,
+    // rewarding you for attacking out of a dodge instead of after it
+    for (let i = -1; i <= 1; i++) {
+      burgerList.push({
+        x: player.x + i * 10,
+        y: player.y - player.r,
+        vy: -5.6,
+        vx: (player.facingX || 0) * 2.6 + i * 1.2,
+        wobble: i,
+        dmg: Math.round(MILKSHAKE_DMG * 0.8),
+        milkshake: true
+      });
+    }
+    addCombo(1);
+    burstParticles(player.x, player.y, { count: 16, color: '#ffd6f5', speed: 5 });
+    addFloatText(player.x, player.y - 26, 'DRIVE-BY', '#ffd6f5', 13);
+    dialogue.textContent = "* DRIVE-BY! Three shakes flung straight out of the dodge!";
+    shotCooldown = 14;
+    return;
+  }
   burgerList.push({
     x: player.x,
     y: player.y - player.r,
@@ -6126,11 +6159,20 @@ function resolveQTE() {
   else if (pos >= 0.28 && pos <= 0.72) { dmg = 4; tier = 'good'; }
 
   if (dmg > 0) {
-    shootBurger(tier === 'perfect');
+    // VARIANT: LAST STAND — under a quarter health your shots hit much
+    // harder, giving a losing run a real comeback path
+    const lastStand = playerHp <= playerMaxHp * 0.25;
+    shootBurger(tier === 'perfect', lastStand);
     addCombo(tier === 'perfect' ? 3 : 1);
-    dialogue.textContent = tier === 'perfect'
-      ? "* PERFECT SHOT! That burger means business!"
-      : "* Burger connects!";
+    if (lastStand) {
+      burstParticles(player.x, player.y - player.r, { count: 18, color: '#ff5c5c', speed: 5 });
+      addFloatText(player.x, player.y - 28, 'LAST STAND', '#ff5c5c', 14);
+      dialogue.textContent = "* LAST STAND! Everything you have left goes into it!";
+    } else {
+      dialogue.textContent = tier === 'perfect'
+        ? "* PERFECT SHOT! That burger means business!"
+        : "* Burger connects!";
+    }
   } else {
     dialogue.textContent = "* Your burger flew wide. No damage!";
   }
@@ -6344,6 +6386,7 @@ function update() {
   // parry (R) — usable anytime EXCEPT during the final round, where the
   // boss attacks you directly instead of through broccoli you can deflect
   if (parryCooldown > 0) parryCooldown -= passiveCooldownTick();
+  if (revengeTimer > 0) revengeTimer--;
   if (parryActive) {
     parryTimer++;
     if (parryTimer > parryWindowLen()) parryActive = false;
@@ -6439,7 +6482,15 @@ function update() {
       freezeCooldown = FREEZE_COOLDOWN_MAX;
       // VARIANT: blocking converts it into a SHATTER BURST — a shorter
       // freeze, but it blows every nearby projectile away from you
-      if (player.blocking) {
+      if (blackoutMode && !player.blocking) {
+        // VARIANT: FLARE — spending the freeze during a blackout burns it
+        // off early to light the arena back up, trading utility for vision
+        blackoutTimer = Math.min(blackoutTimer, 40);
+        freezeTimer = Math.floor(FREEZE_DURATION * 0.6);
+        burstParticles(player.x, player.y, { count: 30, color: '#fff4c2', speed: 6.5, size: 3.6 });
+        addFloatText(player.x, player.y - 26, 'FLARE', '#fff4c2', 14);
+        dialogue.textContent = "* FLARE! The shake bursts into light — the dark breaks!";
+      } else if (player.blocking) {
         freezeTimer = Math.floor(FREEZE_DURATION * 0.45);
         for (const b of broccoliList) {
           const d = Math.hypot(b.x - player.x, b.y - player.y);
@@ -6520,7 +6571,7 @@ function update() {
     if (phase === 4) {
       dialogue.textContent = "* There's nothing left to fight — just let it fade.";
     } else if (!qteActive && attackWindowOpen && shotCooldown <= 0) {
-      throwMilkshake();
+      throwMilkshake(player.invulnTimer > 6); // mid-dash becomes a DRIVE-BY
       attackWindowOpen = false;
       canvas.style.borderColor = '#fff';
     } else if (!attackWindowOpen && !qteActive) {
@@ -6840,7 +6891,17 @@ function update() {
           // PERFECT PARRY — far more damage, more combo, and it refunds the
           // cooldown so a read can be chained straight into the next one
           const perfect = parryTimer <= 4;
-          const dealt = perfect ? PARRY_DMG * 3 : PARRY_DMG;
+          // VARIANT: VENGEANCE — parrying shortly after being hit pays back
+          // double and returns a little of the health you just lost
+          const vengeance = revengeTimer > 0;
+          let dealt = perfect ? PARRY_DMG * 3 : PARRY_DMG;
+          if (vengeance) {
+            dealt *= 2;
+            revengeTimer = 0;
+            playerHp = Math.min(playerMaxHp, playerHp + 6);
+            burstParticles(b.x, b.y, { count: 24, color: '#ff8cf0', speed: 6.5 });
+            addFloatText(player.x, player.y - 30, 'VENGEANCE', '#ff8cf0', 14);
+          }
           bossHp -= dealt;
           b.hit = true;
           parryActive = false; // one knock-back per parry window
@@ -6868,6 +6929,7 @@ function update() {
           if (player.blocking) dmg *= 0.35;
           playerHp -= dmg;
           if (runStats) { runStats.damageTaken += dmg; runStats.hitsTaken++; }
+          revengeTimer = 110; // VENGEANCE window opens
           b.hit = true;
           shakeTime = player.blocking ? 8 : 18;
           shakeMag = player.blocking ? 3 : (b.wave ? 10 : 8);
@@ -6897,6 +6959,18 @@ function update() {
 
   updateParticles();
   updateFloatTexts();
+  // Persistent boss hazards must run every frame, independent of attack
+  // windows. Anything gated behind "!attackWindowOpen" silently freezes for
+  // the whole duration of an opening, which is exactly when the player is
+  // interacting with the boss.
+  if (bossType === 'carrot') {
+    updateCarrotRegen();
+    updateCarrotGuard();
+  } else if (bossType === 'pepper') {
+    updateFirePools();
+    updateResidualHeat();
+    updatePepperCharge();
+  }
   updateRoamFists();
   updatePerfectForm();
   updateMoltenEdge();
